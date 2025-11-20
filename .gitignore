@@ -13,3 +13,6 @@ nfse
 #Ignora qualquer pasta com nome logs e a pasta de testes de API que uso com pequenos projetos para testes
 logs/
 /.TESTES_nao-coloque-no-github
+
+#Ignora todos as pastas credentials/, das quais serão usadas para guardar informações secretas
+credentials/
