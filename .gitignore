@@ -1,0 +1,15 @@
+# Ignorar .env por segurança
+.env
+
+#Ignora todos os tipos de binários que podem ser gerados
+nfse
+.dll
+.exe
+
+#Ignora arquivos gerados pelo vscode ou Goland (pretendo começar a usar num futuro próximo)
+.vscode
+.idea
+
+#Ignora qualquer pasta com nome logs e a pasta de testes de API que uso com pequenos projetos para testes
+logs/
+/.TESTES_nao-coloque-no-github
