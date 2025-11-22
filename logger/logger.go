@@ -8,8 +8,14 @@ import (
 	"time"
 )
 
+type ArquivoLog struct {
+	Escritor *os.File
+	Nome     string
+	Caminho  string
+}
+
 // Cria um arquivo de log na pasta /logs com o formato de nome "nfse_dia-mes-ano_hora-minuto-segundo" e retorna o mesmo
-func CriarArquivoLog() (*os.File, error) {
+func CriarArquivoLog() (*ArquivoLog, error) {
 	// Variável que guarda a hora e datas exatos
 	hora := time.Now()
 
@@ -26,20 +32,39 @@ func CriarArquivoLog() (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	EscreverLog(arquivo, "Começando execução do programa.")
-	return arquivo, nil
+
+	return &ArquivoLog{
+		Escritor: arquivo,
+		Nome:     nomeArquivo,
+		Caminho:  caminho,
+	}, nil
 }
 
-// Escreve uma mensagem no arquivo de log e printa a mesma na tela.
+// Escreve uma mensagem no arquivo de log.
 //
 // Caso não consiga escrever, printa o erro
-func EscreverLog(a *os.File, msg string) error {
+func (a *ArquivoLog) EscreverLog(msg string) error {
 	// Faz ter certeza ABSOLUTA que a mensagem não tem espaços ou quebras de linha no começo ou final.
 	msg = strings.TrimSpace(msg)
-	msgFormatada := fmt.Sprintf("[%s] %s\n", time.Now().Format("02-01-2006 15:04:05.000"), msg)
+	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
+	msgFormatada := fmt.Sprintf("[%s] %s\n", dataExata, msg)
 
-	fmt.Print(msgFormatada)
-	if _, err := a.WriteString(msgFormatada); err != nil {
+	if _, err := a.Escritor.WriteString(msgFormatada); err != nil {
+		fmt.Printf("Erro ao escrever no log: %v\n", err)
+		return err
+	}
+	return nil
+}
+
+// Escreve uma mensagem de erro no arquivo de log.
+//
+// Caso não consiga escrever, printa o erro
+func (a *ArquivoLog) EscreverLogErro(action string, erro error) error {
+	erro = fmt.Errorf("%s: %v", action, erro)
+	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
+	msgFormatada := fmt.Sprintf("[%s] %v\n", dataExata, erro)
+
+	if _, err := a.Escritor.WriteString(msgFormatada); err != nil {
 		fmt.Printf("Erro ao escrever no log: %v\n", err)
 		return err
 	}
