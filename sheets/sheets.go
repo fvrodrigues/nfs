@@ -3,19 +3,27 @@ package sheets
 import (
 	"context"
 	"fmt"
-	"nfse/errs"
+	"nfse/logger"
 
 	"google.golang.org/api/sheets/v4"
 )
 
 // Struct que manterá dados da planilha
 type Planilha struct {
-	ID      string
-	Service *sheets.Service
+	ID string
+	*sheets.Service
+	Log *logger.ArquivoLog
 
 	Linhas   uint32
 	Conteudo [][]any
 	Clientes []Cliente
+}
+
+func NovaPlanilha(l *logger.ArquivoLog, spreadSheetID string) *Planilha {
+	return &Planilha{
+		ID:  spreadSheetID,
+		Log: l,
+	}
 }
 
 type Cliente struct {
@@ -25,10 +33,10 @@ type Cliente struct {
 	emitido any
 }
 
-// NovaPlanilha cria um struct com os daods ID e Service da planilha para armazenar os dados necessários para leitura e alteração
+// NovaConn cria o *sheets.Service da planilha
 //
 // Isso porque NewService() não cria uma conexão, somente recebe dados, que são perdidos caso não armazenados
-func NovaPlanilha(spreadSheetID string) (*Planilha, error) {
+func (p *Planilha) NovaConn() error {
 	// Cria o contexto para aplicação
 	ctx := context.Background()
 
@@ -36,14 +44,11 @@ func NovaPlanilha(spreadSheetID string) (*Planilha, error) {
 	// A variável deve ser pré-definida com comando export no Linux ou $env no Windows e seu valor deve ser o caminho para o JSON com as infos do Google Service
 	srv, err := sheets.NewService(ctx)
 	if err != nil {
-
-		return nil, errs.Formatar("se conectar com a API", err)
+		return err
 	}
 
-	return &Planilha{
-		ID:      spreadSheetID,
-		Service: srv,
-	}, nil
+	p.Service = srv
+	return nil
 }
 
 // Ler popula o campo "Conteudo" do struct, que contém o conteúdo das células
@@ -54,9 +59,8 @@ func NovaPlanilha(spreadSheetID string) (*Planilha, error) {
 func (p *Planilha) Ler(celulas string) ([][]any, error) {
 	resp, err := p.Service.Spreadsheets.Values.Get(p.ID, celulas).Do()
 	if err != nil {
-		return nil, errs.Formatar("ler a planilha.", err)
+		return nil, err
 	}
-
 	return resp.Values, nil
 }
 
@@ -65,6 +69,7 @@ func (p *Planilha) Ler(celulas string) ([][]any, error) {
 func (p *Planilha) ListarAbas() (nomes []string, err error) {
 	resp, err := p.Service.Spreadsheets.Get(p.ID).Fields("sheets.properties.title").Do()
 	if err != nil {
+		p.Log.EscreverLogErro("listar abas da planilha", err)
 		return nil, err
 	}
 
@@ -82,6 +87,7 @@ func (p *Planilha) ContarLinhasNaoVazias(aba string) (abas uint32, err error) {
 	intervalo := fmt.Sprintf("%s!A:A", aba)
 	resp, err := p.Service.Spreadsheets.Values.Get(p.ID, intervalo).Do()
 	if err != nil {
+		p.Log.EscreverLogErro("contar as linhas não vazias", err)
 		return 0, err
 	}
 

@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"nfse/errs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,9 +10,9 @@ import (
 )
 
 type ArquivoLog struct {
-	Escritor *os.File
-	Nome     string
-	Caminho  string
+	File    *os.File
+	Nome    string
+	Caminho string
 }
 
 // Cria um arquivo de log na pasta /logs com o formato de nome "nfse_dia-mes-ano_hora-minuto-segundo" e retorna o mesmo
@@ -34,9 +35,9 @@ func CriarArquivoLog() (*ArquivoLog, error) {
 	}
 
 	return &ArquivoLog{
-		Escritor: arquivo,
-		Nome:     nomeArquivo,
-		Caminho:  caminho,
+		arquivo,
+		nomeArquivo,
+		caminho,
 	}, nil
 }
 
@@ -49,7 +50,7 @@ func (a *ArquivoLog) EscreverLog(msg string) error {
 	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
 	msgFormatada := fmt.Sprintf("[%s] %s\n", dataExata, msg)
 
-	if _, err := a.Escritor.WriteString(msgFormatada); err != nil {
+	if _, err := a.File.WriteString(msgFormatada); err != nil {
 		fmt.Printf("Erro ao escrever no log: %v\n", err)
 		return err
 	}
@@ -57,16 +58,44 @@ func (a *ArquivoLog) EscreverLog(msg string) error {
 }
 
 // Escreve uma mensagem de erro no arquivo de log.
+// Usa a função errs.Formatar da bib interna para formatar a mensagem de erro
 //
 // Caso não consiga escrever, printa o erro
 func (a *ArquivoLog) EscreverLogErro(action string, erro error) error {
-	erro = fmt.Errorf("%s: %v", action, erro)
+	erro = errs.Formatar(action, erro)
 	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
 	msgFormatada := fmt.Sprintf("[%s] %v\n", dataExata, erro)
 
-	if _, err := a.Escritor.WriteString(msgFormatada); err != nil {
+	if _, err := a.File.WriteString(msgFormatada); err != nil {
 		fmt.Printf("Erro ao escrever no log: %v\n", err)
 		return err
 	}
 	return nil
+}
+
+// Escreve uma mensagem de erro no arquivo de log, além de matar o programa.
+// Usa a função errs.Formatar da bib interna para formatar a mensagem de erro
+//
+// Caso não consiga escrever, printa o erro
+func (a *ArquivoLog) EscreverLogMata(action string, erro error) error {
+	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
+	msgFormatada := fmt.Sprintf("[%s] %v\n", dataExata, erro)
+
+	if _, err := a.File.WriteString(msgFormatada); err != nil {
+		fmt.Printf("Erro ao escrever no log: %v\n", err)
+		return err
+	}
+	errs.Mata(action, erro)
+	return nil
+}
+
+// NaoAchaElemento escreve uma mensagem no log e mata o programa.
+//
+// Usado especialmente quando o programa falhar em encontrar um elemento HTML
+func (a *ArquivoLog) NaoAchaElemento(HTMLElement string, err error) error {
+	return a.EscreverLogMata(fmt.Sprintf("tentar encontrar o elemento %s", HTMLElement), err)
+}
+
+func (l *ArquivoLog) Fechar() {
+	l.File.Close()
 }

@@ -16,3 +16,6 @@ logs/
 
 #Ignora todos as pastas credentials/, das quais serão usadas para guardar informações secretas
 credentials/
+
+#Ignora código antigo
+bot*
