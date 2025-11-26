@@ -2,47 +2,58 @@ package main
 
 import (
 	"fmt"
-	"nfse/errs"
-	"nfse/logger"
-	"nfse/rod"
-	"nfse/sheets"
+	"nfse/pkg/config"
+	"nfse/pkg/errs"
+	"nfse/pkg/logger"
+	"nfse/pkg/receita"
+	"nfse/pkg/rod"
+	"nfse/pkg/sheets"
+	"nfse/pkg/workflow"
 	"sync"
 	"time"
 )
 
 func main() {
-	// Para teste, faz a aplicação esperar uma hora antes de fechar
 	var wg sync.WaitGroup
 	wg.Add(1)
+	go EsperarUmaHora(&wg)
 
-	go func() {
-		defer wg.Done() // avisa quando terminar
-		fmt.Println("Routine iniciada.")
-		time.Sleep(time.Hour) // espera 1 hora
-		fmt.Println("Routine finalizada.")
-	}()
-	// ------------------------------------------------------------
+	if err := run(); err != nil {
+		panic("Nao deu nada certo")
+	}
+	wg.Wait()
+}
 
-	logger, err := logger.CriarArquivoLog()
+func run() error {
+	logger, err := logger.New()
 	if err != nil {
 		errs.Formatar("criar pasta /logs ou arquivo de log", err)
 	}
 	defer logger.Fechar()
 
-	planilha := sheets.NovaPlanilha(logger, "fvbaFPp4wjlKt448lpMZv2Yze2qCTLVpjp4w")
-	if err = planilha.NovaConn(); err != nil {
-		logger.EscreverLogMata("criar conexão com a API do Google Sheets", err)
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("%T, %v", cfg, cfg)
+		logger.EscreverMata("ler informações do arquivo .env", err)
 	}
 
-	pag := rod.CriarNavegador(logger, false)
-	defer pag.Pagina.Close()
+	planilha := sheets.NovaPlanilha(logger, cfg.SheetID)
+	if err = planilha.NovaConn(); err != nil {
+		logger.EscreverMata("criar conexão com a API do Google Sheets", err)
+	}
 
-	pag.AcessarSite("https://nfe.prefeitura.sp.gov.br/login.aspx")
-	pag.ApertarElemento(".oauth-name")
-	time.Sleep(4 * time.Second)
+	pagina := rod.CriarNavegador(logger, false)
+	defer pagina.Close()
 
-	fmt.Printf("Execução do programada terminada. Cheque os logs em %v\n", logger.Caminho)
+	receita := receita.New(pagina)
 
-	wg.Wait() // espera a goroutine terminar
-	fmt.Println("Programa encerrado.")
+	w := workflow.New(cfg, planilha, pagina, receita)
+	// return temporário.
+	// run() deve retornar sempre um função orquestrante de workflow
+	return w.Executar()
+}
+
+func EsperarUmaHora(wg *sync.WaitGroup) {
+	defer wg.Done()
+	time.Sleep(time.Hour)
 }

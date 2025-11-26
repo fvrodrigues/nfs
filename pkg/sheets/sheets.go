@@ -3,7 +3,7 @@ package sheets
 import (
 	"context"
 	"fmt"
-	"nfse/logger"
+	"nfse/pkg/logger"
 
 	"google.golang.org/api/sheets/v4"
 )
@@ -69,7 +69,7 @@ func (p *Planilha) Ler(celulas string) ([][]any, error) {
 func (p *Planilha) ListarAbas() (nomes []string, err error) {
 	resp, err := p.Service.Spreadsheets.Get(p.ID).Fields("sheets.properties.title").Do()
 	if err != nil {
-		p.Log.EscreverLogErro("listar abas da planilha", err)
+		p.Log.EscreverErro("listar abas da planilha", err)
 		return nil, err
 	}
 
@@ -87,7 +87,7 @@ func (p *Planilha) ContarLinhasNaoVazias(aba string) (abas uint32, err error) {
 	intervalo := fmt.Sprintf("%s!A:A", aba)
 	resp, err := p.Service.Spreadsheets.Values.Get(p.ID, intervalo).Do()
 	if err != nil {
-		p.Log.EscreverLogErro("contar as linhas não vazias", err)
+		p.Log.EscreverErro("contar as linhas não vazias", err)
 		return 0, err
 	}
 

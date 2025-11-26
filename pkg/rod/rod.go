@@ -3,7 +3,7 @@ package rod
 import (
 	"fmt"
 	"math/rand"
-	"nfse/logger"
+	"nfse/pkg/logger"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -15,12 +15,13 @@ import (
 type Pagina struct {
 	Log       *logger.ArquivoLog
 	Navegador *rod.Browser
-	Pagina    *rod.Page
+	// Mesmo com embedded field, o nome desse campo é "Page"
+	*rod.Page
 }
 
 // Cria uma instância do navegador configurado para a automação e inicia o logger.
 // Aceita como argumento o logger e um bool, se true, navegador virá headless
-func CriarNavegador(log *logger.ArquivoLog, headless bool) *Pagina {
+func CriarNavegador(log *logger.ArquivoLog, headless bool) (p *Pagina) {
 
 	// Cria um launcher, baixa o navegador caso não o tenha instalado. Aqui podemos mudar as opções
 	l := launcher.New().Headless(headless).Devtools(true)
@@ -34,7 +35,7 @@ func CriarNavegador(log *logger.ArquivoLog, headless bool) *Pagina {
 
 	url, err := l.Launch()
 	if err != nil {
-		log.EscreverLogMata("gerar URL de conexão do navegador", err)
+		log.EscreverMata("gerar URL de conexão do navegador", err)
 	}
 
 	browser := rod.New().ControlURL(url).NoDefaultDevice().MustConnect()
@@ -42,18 +43,19 @@ func CriarNavegador(log *logger.ArquivoLog, headless bool) *Pagina {
 	return &Pagina{
 		Log:       log,
 		Navegador: browser,
-		Pagina:    page,
+		Page:      page,
 	}
 }
 
+// AcessarSite Com um navegador e página já instanciados
 func (p *Pagina) AcessarSite(url string) {
-	if err := p.Pagina.Navigate(url); err != nil {
-		p.Log.EscreverLogMata("Se conectar com o website. Verifique se o mesmo foi escrito corretamente.", err)
+	if err := p.Navigate(url); err != nil {
+		p.Log.EscreverMata("se conectar com o website", err)
 	}
-	p.Pagina.MustWindowFullscreen()
-	p.Pagina.MustWaitStable()
+	p.MustWindowFullscreen()
+	p.MustWaitStable()
 	fmt.Printf("Acessado: %s\n", url)
-	p.Log.EscreverLog(fmt.Sprintf("Website %s acessado com sucesso.", url))
+	p.Log.Escrever(fmt.Sprintf("Website %s acessado com sucesso.", url))
 }
 
 // ApertarElemento usa a própria bib rod para fazer movimentos humanos e clicar em um botao ou elemento especificado
@@ -66,23 +68,23 @@ func (p *Pagina) ApertarElemento(HTMLElement string) {
 
 	botao.MustHover()
 	p.PausaHumana(2)
-	p.Pagina.Mouse.MustDown(proto.InputMouseButtonLeft)
+	p.Mouse.MustDown(proto.InputMouseButtonLeft)
 	p.PausaHumana(0)
-	p.Pagina.Mouse.MustUp(proto.InputMouseButtonLeft)
+	p.Mouse.MustUp(proto.InputMouseButtonLeft)
 }
 
 // ApertarElementoDefinido Assim como ApertarElemento clica num elemento com movimento humano exceto que recebe o próprio elemento como argumento para que não precise procurar na página. Útil quando o elemento já está declarado.
 func (p *Pagina) ApertarElementoDefinido(elemento *rod.Element) {
 	elemento.MustHover()
 	p.PausaHumana(2)
-	p.Pagina.Mouse.MustDown(proto.InputMouseButtonLeft)
+	p.Mouse.MustDown(proto.InputMouseButtonLeft)
 	p.PausaHumana(0)
-	p.Pagina.Mouse.MustUp(proto.InputMouseButtonLeft)
+	p.Mouse.MustUp(proto.InputMouseButtonLeft)
 }
 
 // Retorna um elemento e recebe um tempo de timeout. Retornará um erro caso acabe o tempo e o elemento não for encontrado
 func (p *Pagina) RetornaElemento(HTMLElement string, tempo time.Duration) (*rod.Element, error) {
-	return p.Pagina.Timeout(tempo * time.Second).Element(HTMLElement)
+	return p.Timeout(tempo * time.Second).Element(HTMLElement)
 }
 
 // EscreverComoHumano escreve o texto de modo humanizado com delay random entre cada tecla digitada, além de clicar no campo do form como um humano faria usando a função interna ApertarElemento.
@@ -104,7 +106,7 @@ func (p *Pagina) EscreverComoHumano(HTMLElement string, conteudo string) {
 //
 // Retorna X e Y de um elemento, ou erro caso falhe em encontrar.
 func (p *Pagina) LocalizarElemento(timeout time.Duration, HTMLElement string) (elX, elY float64, err error) {
-	el, err := p.Pagina.Timeout(timeout * time.Second).Element(HTMLElement)
+	el, err := p.Timeout(timeout * time.Second).Element(HTMLElement)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -133,5 +135,5 @@ func (p *Pagina) PausaHumana(tipo uint8) {
 
 // Fecha a conexão
 func (p *Pagina) Fechar() {
-	p.Pagina.Close()
+	p.Close()
 }

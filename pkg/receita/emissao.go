@@ -1,0 +1,5 @@
+package receita
+
+func Emitir() {
+	
+}

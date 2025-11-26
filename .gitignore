@@ -6,7 +6,7 @@ nfse
 .dll
 .exe
 
-#Ignora arquivos gerados pelo vscode ou Goland (pretendo começar a usar num futuro próximo)
+#Ignora arquivos gerados pelo vscode ou Goland
 .vscode
 .idea
 
