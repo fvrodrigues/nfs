@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"nfse/pkg/config"
 	"nfse/pkg/errs"
 	"nfse/pkg/logger"
@@ -19,7 +18,7 @@ func main() {
 	go EsperarUmaHora(&wg)
 
 	if err := run(); err != nil {
-		panic("Nao deu nada certo")
+		panic(err)
 	}
 	wg.Wait()
 }
@@ -27,29 +26,29 @@ func main() {
 func run() error {
 	logger, err := logger.New()
 	if err != nil {
-		errs.Formatar("criar pasta /logs ou arquivo de log", err)
+		return errs.Formatar("criar pasta /logs ou arquivo de log", err)
 	}
 	defer logger.Fechar()
 
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Printf("%T, %v", cfg, cfg)
-		logger.EscreverMata("ler informações do arquivo .env", err)
+		return logger.EscreverErro("ler informações do arquivo .env", err)
 	}
 
 	planilha := sheets.NovaPlanilha(logger, cfg.SheetID)
-	if err = planilha.NovaConn(); err != nil {
-		logger.EscreverMata("criar conexão com a API do Google Sheets", err)
+	if err := planilha.NovaConn(); err != nil {
+		return logger.EscreverErro("criar conexão com a API do Google Sheets", err)
 	}
 
-	pagina := rod.CriarNavegador(logger, false)
+	pagina, err := rod.CriarNavegador(logger, false)
+	if err != nil {
+		return logger.EscreverErro("criar instância de navegador", err)
+	}
 	defer pagina.Close()
 
 	receita := receita.New(pagina)
 
-	w := workflow.New(cfg, planilha, pagina, receita)
-	// return temporário.
-	// run() deve retornar sempre um função orquestrante de workflow
+	w := workflow.New(logger, cfg, planilha, pagina, receita)
 	return w.Executar()
 }
 

@@ -5,7 +5,6 @@ import (
 	"nfse/pkg/errs"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -41,16 +40,19 @@ func New() (*ArquivoLog, error) {
 	}, nil
 }
 
+// Formata a mensagem em formato de log
+func (a *ArquivoLog) Format(msg any) (msgFormatada string) {
+	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
+	msgFormatada = fmt.Sprintf("[%s] %s\n", dataExata, msg)
+	return
+}
+
 // Escreve uma mensagem no arquivo de log.
 //
 // Caso não consiga escrever, printa o erro
 func (a *ArquivoLog) Escrever(msg string) error {
-	// Faz ter certeza ABSOLUTA que a mensagem não tem espaços ou quebras de linha no começo ou final.
-	msg = strings.TrimSpace(msg)
-	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
-	msgFormatada := fmt.Sprintf("[%s] %s\n", dataExata, msg)
-
-	if _, err := a.File.WriteString(msgFormatada); err != nil {
+	msg = a.Format(msg)
+	if _, err := a.File.WriteString(msg); err != nil {
 		fmt.Printf("Erro ao escrever no log: %v\n", err)
 		return err
 	}
@@ -63,14 +65,13 @@ func (a *ArquivoLog) Escrever(msg string) error {
 // Caso não consiga escrever, printa o erro
 func (a *ArquivoLog) EscreverErro(action string, erro error) error {
 	erro = errs.Formatar(action, erro)
-	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
-	msgFormatada := fmt.Sprintf("[%s] %v\n", dataExata, erro)
+	erroFormatado := a.Format(erro)
 
-	if _, err := a.File.WriteString(msgFormatada); err != nil {
+	if _, err := a.File.WriteString(erroFormatado); err != nil {
 		fmt.Printf("Erro ao escrever no log: %v\n", err)
 		return err
 	}
-	return nil
+	return erro
 }
 
 // Escreve uma mensagem de erro no arquivo de log, além de matar o programa.
@@ -90,12 +91,17 @@ func (a *ArquivoLog) EscreverMata(action string, erro error) error {
 }
 
 // NaoAchaElemento escreve uma mensagem no log e mata o programa.
-//
+// API do Google Sheets
 // Usado especialmente quando o programa falhar em encontrar um elemento HTML
 func (a *ArquivoLog) NaoAchaElemento(HTMLElement string, err error) error {
-	return a.EscreverMata(fmt.Sprintf("tentar encontrar o elemento %s", HTMLElement), err)
+	return a.EscreverErro(fmt.Sprintf("tentar encontrar o elemento %s", HTMLElement), err)
 }
 
 func (l *ArquivoLog) Fechar() {
 	l.File.Close()
+}
+
+func (a *ArquivoLog) EncerrarAplicacao() {
+	a.Escrever("Aplicação encerrada.")
+	fmt.Println("Aplicação encerrada, cheque os logs em ", a.Caminho)
 }

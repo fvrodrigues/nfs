@@ -1,22 +1,24 @@
 package workflow
 
 import (
-	"fmt"
 	"nfse/pkg/config"
+	"nfse/pkg/logger"
 	"nfse/pkg/receita"
 	"nfse/pkg/rod"
 	"nfse/pkg/sheets"
 )
 
 type Workflow struct {
+	logger   *logger.ArquivoLog
 	cfg      config.Config
 	planilha *sheets.Planilha
 	pagina   *rod.Pagina
 	receita  *receita.Receita
 }
 
-func New(cfg config.Config, planilha *sheets.Planilha, pagina *rod.Pagina, receita *receita.Receita) *Workflow {
+func New(logger *logger.ArquivoLog, cfg config.Config, planilha *sheets.Planilha, pagina *rod.Pagina, receita *receita.Receita) *Workflow {
 	return &Workflow{
+		logger:   logger,
 		planilha: planilha,
 		pagina:   pagina,
 		receita:  receita,
@@ -25,6 +27,7 @@ func New(cfg config.Config, planilha *sheets.Planilha, pagina *rod.Pagina, recei
 }
 
 func (w *Workflow) Executar() error {
-	w.receita.Acessar(w.cfg.Website)
+	defer w.logger.EncerrarAplicacao()
+	w.receita.AcessarSiteReceita(w.cfg.Website)
 	return nil
 }

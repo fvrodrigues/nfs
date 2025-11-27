@@ -69,7 +69,6 @@ func (p *Planilha) Ler(celulas string) ([][]any, error) {
 func (p *Planilha) ListarAbas() (nomes []string, err error) {
 	resp, err := p.Service.Spreadsheets.Get(p.ID).Fields("sheets.properties.title").Do()
 	if err != nil {
-		p.Log.EscreverErro("listar abas da planilha", err)
 		return nil, err
 	}
 
@@ -87,7 +86,6 @@ func (p *Planilha) ContarLinhasNaoVazias(aba string) (abas uint32, err error) {
 	intervalo := fmt.Sprintf("%s!A:A", aba)
 	resp, err := p.Service.Spreadsheets.Values.Get(p.ID, intervalo).Do()
 	if err != nil {
-		p.Log.EscreverErro("contar as linhas não vazias", err)
 		return 0, err
 	}
 
@@ -100,6 +98,13 @@ func (p *Planilha) ContarLinhasNaoVazias(aba string) (abas uint32, err error) {
 			abas++
 		}
 	}
-
 	return
+}
+
+func (p *Planilha) LerDadosClientes() ([][][]any, error) {
+	// aqui terao dados de todos os clientes, vai pegar tudo da planilha
+	// o objetivo é um loop q salve os dados de cada em um slice
+	// anatomia do slice:
+	// [    [[][][]], [[][][]], [[][][]]<----planilhas e suas linhas    ] <---tudo
+	return nil, nil
 }

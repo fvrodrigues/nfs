@@ -21,7 +21,7 @@ type Pagina struct {
 
 // Cria uma instância do navegador configurado para a automação e inicia o logger.
 // Aceita como argumento o logger e um bool, se true, navegador virá headless
-func CriarNavegador(log *logger.ArquivoLog, headless bool) (p *Pagina) {
+func CriarNavegador(log *logger.ArquivoLog, headless bool) (p *Pagina, err error) {
 
 	// Cria um launcher, baixa o navegador caso não o tenha instalado. Aqui podemos mudar as opções
 	l := launcher.New().Headless(headless).Devtools(true)
@@ -35,7 +35,8 @@ func CriarNavegador(log *logger.ArquivoLog, headless bool) (p *Pagina) {
 
 	url, err := l.Launch()
 	if err != nil {
-		log.EscreverMata("gerar URL de conexão do navegador", err)
+		log.EscreverErro("gerar URL de conexão do navegador", err)
+		return nil, err
 	}
 
 	browser := rod.New().ControlURL(url).NoDefaultDevice().MustConnect()
@@ -44,18 +45,19 @@ func CriarNavegador(log *logger.ArquivoLog, headless bool) (p *Pagina) {
 		Log:       log,
 		Navegador: browser,
 		Page:      page,
-	}
+	}, nil
 }
 
 // AcessarSite Com um navegador e página já instanciados
-func (p *Pagina) AcessarSite(url string) {
+func (p *Pagina) AcessarSite(url string) error {
 	if err := p.Navigate(url); err != nil {
-		p.Log.EscreverMata("se conectar com o website", err)
+		return err
 	}
 	p.MustWindowFullscreen()
 	p.MustWaitStable()
 	fmt.Printf("Acessado: %s\n", url)
 	p.Log.Escrever(fmt.Sprintf("Website %s acessado com sucesso.", url))
+	return nil
 }
 
 // ApertarElemento usa a própria bib rod para fazer movimentos humanos e clicar em um botao ou elemento especificado

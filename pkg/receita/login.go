@@ -12,9 +12,11 @@ func New(pagina *rod.Pagina) *Receita {
 	}
 }
 
-func (r *Receita) Acessar(url string) {
-	r.AcessarSite(url)
-
+func (r *Receita) AcessarSiteReceita(url string) error {
+	if err := r.AcessarSite(url); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *Receita) Login(cnpj string, senha string) {
