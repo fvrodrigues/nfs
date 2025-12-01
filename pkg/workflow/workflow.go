@@ -28,6 +28,7 @@ func New(logger *logger.ArquivoLog, cfg config.Config, planilha *sheets.Planilha
 
 func (w *Workflow) Executar() error {
 	defer w.logger.EncerrarAplicacao()
-	w.receita.AcessarSiteReceita(w.cfg.Website)
+	// w.receita.AcessarSiteReceita(w.cfg.Website)
+	w.planilha.ParserDados()
 	return nil
 }
