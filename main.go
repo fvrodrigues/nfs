@@ -36,7 +36,7 @@ func run() error {
 	}
 
 	planilha := sheets.NovaPlanilha(logger, cfg.SheetID)
-	if err := planilha.NovaConn(); err != nil {
+	if err := planilha.NewService(); err != nil {
 		return logger.EscreverErro("criar conexão com a API do Google Sheets", err)
 	}
 

@@ -30,3 +30,7 @@ func Encerrar(err error, caminho string) {
 	fmt.Printf("O programa encerrou pelo seguinte motivo:\n %v\nVeja os logs em %s", err, caminho)
 	os.Exit(1)
 }
+
+func Criar(action string, err error) error {
+	return fmt.Errorf("Erro ao %s", action)
+}
