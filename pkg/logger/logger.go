@@ -40,14 +40,14 @@ func New() (*ArquivoLog, error) {
 	}, nil
 }
 
-// Formata a mensagem em formato de log
+// Format formata a mensagem em formato de log
 func (a *ArquivoLog) Format(msg any) (msgFormatada string) {
 	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
 	msgFormatada = fmt.Sprintf("[%s] %s\n", dataExata, msg)
 	return
 }
 
-// Escreve uma mensagem no arquivo de log.
+// Escrever uma mensagem no arquivo de log.
 //
 // Caso não consiga escrever, printa o erro
 func (a *ArquivoLog) Escrever(msg string) error {
@@ -97,11 +97,11 @@ func (a *ArquivoLog) NaoAchaElemento(HTMLElement string, err error) error {
 	return a.EscreverErro(fmt.Sprintf("tentar encontrar o elemento %s", HTMLElement), err)
 }
 
-func (l *ArquivoLog) Fechar() {
-	l.File.Close()
+func (a *ArquivoLog) Fechar() {
+	_ = a.File.Close()
 }
 
 func (a *ArquivoLog) EncerrarAplicacao() {
-	a.Escrever("Aplicação encerrada.")
+	_ = a.Escrever("Aplicação encerrada.")
 	fmt.Println("Aplicação encerrada, cheque os logs em ", a.Caminho)
 }

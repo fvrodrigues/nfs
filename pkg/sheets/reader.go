@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+type Cliente struct {
+	Empresa string
+
+	Login string
+	Senha string
+
+	Emitir map[string][]Nota
+}
+
 type Nota struct {
 	Tomador    string
 	Cnpj       string
@@ -15,6 +24,7 @@ type Nota struct {
 	Link    string
 }
 
+// TrataValoresDasAbas recebe uma lista de linhas e retorna uma lista de Nota.
 func (p *Planilha) TrataValoresDasAbas(linhas [][]any) ([]Nota, error) {
 	var notas []Nota
 
@@ -56,7 +66,7 @@ func (p *Planilha) TrataValoresDasAbas(linhas [][]any) ([]Nota, error) {
 	return notas, nil
 }
 
-// Lê os dados de todas as abas e os coloca na struct Nota, além de fazer o parse para o tipo correto de dado.
+// ParserDados lê os dados de todas as abas e os coloca na struct Nota, além de fazer o parse para o tipo correto de dado.
 func (p *Planilha) ParserDados() (map[string][]Nota, error) {
 	var notas = map[string][]Nota{}
 	abas, err := p.ListarAbas()
@@ -66,9 +76,40 @@ func (p *Planilha) ParserDados() (map[string][]Nota, error) {
 
 	for _, aba := range abas {
 		abaToLower := strings.ToLower(aba)
-		if strings.Contains(abaToLower, "resposta") || strings.Contains(abaToLower, "info") {
-			fmt.Printf("Pulando aba *%s* pois é de forms ou info\n", aba)
+		if strings.Contains(abaToLower, "resposta") {
+			fmt.Printf("Pulando aba *%s* pois é de script do forms\n", aba)
 			continue
+		}
+		if strings.Contains(abaToLower, "info") {
+			rangeFormatado := fmt.Sprintf("%s!A:Z", aba)
+			linhas, err := p.Ler(rangeFormatado)
+			if err != nil {
+				return nil, err
+			}
+
+			for i, linha := range linhas {
+				var temCelulaVazia bool
+
+				for _, celula := range linha {
+					celula = fmt.Sprintf("%v", celula)
+					if celula == "" {
+						fmt.Printf("Célula vazia na linha %d, pulando...\n", i+1)
+						temCelulaVazia = true
+						break
+					}
+				}
+				if temCelulaVazia {
+					fmt.Printf("Linha %d vazia, pulando...\n", i+1)
+					continue
+				}
+
+				// Compara o nome da empresa com o nome da aba.
+				empresaToLower := strings.ToLower(linha[0].(string))
+				if abaToLower == empresaToLower {
+
+				}
+				cliente := Cliente{}
+			}
 		}
 
 		linhasComValor, err := p.ContarLinhasNaoVazias(aba)
@@ -115,4 +156,8 @@ func AcharIndiceColuna(header []any, str string) int {
 
 func AtribuiValores(header []any) (int, int, int, int, int, int) {
 	return AcharIndiceColuna(header, "tomador"), AcharIndiceColuna(header, "cnpj"), AcharIndiceColuna(header, "valor"), AcharIndiceColuna(header, "obs"), AcharIndiceColuna(header, "emiss"), AcharIndiceColuna(header, "link")
+}
+
+func LerDadosDeLogin(p *Planilha) (map[string][]Nota, error) {
+	return nil, nil
 }

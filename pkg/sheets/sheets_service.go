@@ -25,7 +25,7 @@ func NovaPlanilha(l *logger.ArquivoLog, spreadSheetID string) *Planilha {
 	}
 }
 
-// NewService cria o *sheets.Service da planilha
+// NewService cria o Service da planilha
 func (p *Planilha) NewService() error {
 	ctx := context.Background()
 
@@ -49,8 +49,8 @@ func (p *Planilha) Ler(celulas string) ([][]any, error) {
 	return resp.Values, nil
 }
 
-// ListarAbas checa as abas/páginas disponíveis da planilha e guarda seus nomes um slice de string.
-// As strings são formatadas para lowercase
+// ListarAbas checa as abas/páginas disponíveis da planilha e guarda os nomes um slice de ‘string’.
+// As ‘strings’ são formatadas para lowercase
 // Especialmente útil para planilhas que usam várias páginas
 func (p *Planilha) ListarAbas() (nomes []string, err error) {
 	resp, err := p.Service.Spreadsheets.Get(p.ID).Fields("sheets.properties.title").Do()

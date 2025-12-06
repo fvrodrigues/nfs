@@ -19,11 +19,10 @@ type Pagina struct {
 	*rod.Page
 }
 
-// Cria uma instância do navegador configurado para a automação e inicia o logger.
-// Aceita como argumento o logger e um bool, se true, navegador virá headless
-func CriarNavegador(log *logger.ArquivoLog, headless bool) (p *Pagina, err error) {
+// CriarNavegador cria uma instância do navegador configurado para a automação e inicia o logger.
+// Se true, navegador virá headless
+func CriarNavegador(log *logger.ArquivoLog, headless bool) (*Pagina, error) {
 
-	// Cria um launcher, baixa o navegador caso não o tenha instalado. Aqui podemos mudar as opções
 	l := launcher.New().Headless(headless).Devtools(true)
 	l.Set("disable-gpu")
 	l.Set("no-sandbox")
@@ -35,7 +34,6 @@ func CriarNavegador(log *logger.ArquivoLog, headless bool) (p *Pagina, err error
 
 	url, err := l.Launch()
 	if err != nil {
-		log.EscreverErro("gerar URL de conexão do navegador", err)
 		return nil, err
 	}
 
@@ -56,16 +54,15 @@ func (p *Pagina) AcessarSite(url string) error {
 	p.MustWindowFullscreen()
 	p.MustWaitStable()
 	fmt.Printf("Acessado: %s\n", url)
-	p.Log.Escrever(fmt.Sprintf("Website %s acessado com sucesso.", url))
 	return nil
 }
 
 // ApertarElemento usa a própria bib rod para fazer movimentos humanos e clicar em um botao ou elemento especificado
-// Recebe HTMLElement como argumento. Recomendado usar . para classe e # para id
-func (p *Pagina) ApertarElemento(HTMLElement string) {
+// Recebe HTMLElement como argumento.
+func (p *Pagina) ApertarElemento(HTMLElement string) error {
 	botao, err := p.RetornaElemento(HTMLElement, 5)
 	if err != nil {
-		p.Log.NaoAchaElemento(HTMLElement, err)
+		return fmt.Errorf("Erro ao encontrar elemento %s: %v\n", HTMLElement, err)
 	}
 
 	botao.MustHover()
@@ -73,9 +70,11 @@ func (p *Pagina) ApertarElemento(HTMLElement string) {
 	p.Mouse.MustDown(proto.InputMouseButtonLeft)
 	p.PausaHumana(0)
 	p.Mouse.MustUp(proto.InputMouseButtonLeft)
+
+	return nil
 }
 
-// ApertarElementoDefinido Assim como ApertarElemento clica num elemento com movimento humano exceto que recebe o próprio elemento como argumento para que não precise procurar na página. Útil quando o elemento já está declarado.
+// ApertarElementoDefinido Assim como ApertarElemento clica num elemento com movimento humano exceto que recebe o próprio elemento como argumento para não procurar na página. Útil quando o elemento já está declarado.
 func (p *Pagina) ApertarElementoDefinido(elemento *rod.Element) {
 	elemento.MustHover()
 	p.PausaHumana(2)
@@ -84,16 +83,16 @@ func (p *Pagina) ApertarElementoDefinido(elemento *rod.Element) {
 	p.Mouse.MustUp(proto.InputMouseButtonLeft)
 }
 
-// Retorna um elemento e recebe um tempo de timeout. Retornará um erro caso acabe o tempo e o elemento não for encontrado
+// RetornaElemento retorna um elemento e recebe um tempo de timeout. Retornará um erro caso acabe o tempo e o elemento não for encontrado
 func (p *Pagina) RetornaElemento(HTMLElement string, tempo time.Duration) (*rod.Element, error) {
 	return p.Timeout(tempo * time.Second).Element(HTMLElement)
 }
 
 // EscreverComoHumano escreve o texto de modo humanizado com delay random entre cada tecla digitada, além de clicar no campo do form como um humano faria usando a função interna ApertarElemento.
-func (p *Pagina) EscreverComoHumano(HTMLElement string, conteudo string) {
+func (p *Pagina) EscreverComoHumano(HTMLElement string, conteudo string) error {
 	el, err := p.RetornaElemento(HTMLElement, 5)
 	if err != nil {
-		p.Log.NaoAchaElemento(HTMLElement, err)
+		return fmt.Errorf("Erro ao encontrar elemento %s: %v\n", HTMLElement, err)
 	}
 	p.ApertarElementoDefinido(el)
 
@@ -101,10 +100,11 @@ func (p *Pagina) EscreverComoHumano(HTMLElement string, conteudo string) {
 		p.PausaHumana(1)
 		el.MustInput(string(char))
 	}
+	return nil
 }
 
-// LocalizarElemento localiza um elemento na tela. Recebe como parâmetro o tempo de timeout em segundos que poderá demorar e o elemento a se procurar.
-// O correto é que se coloque "." para buscar por classe ou "#" por id.
+// LocalizarElemento localiza um elemento na tela. Recebe como parâmetro o tempo de timeout em segundos que poderá demorar e o elemento à se procurar.
+// O correto é que se coloque "." para buscar por classe ou "#" por -ID-.
 //
 // Retorna X e Y de um elemento, ou erro caso falhe em encontrar.
 func (p *Pagina) LocalizarElemento(timeout time.Duration, HTMLElement string) (elX, elY float64, err error) {
@@ -115,7 +115,7 @@ func (p *Pagina) LocalizarElemento(timeout time.Duration, HTMLElement string) (e
 	return el.MustShape().Box().X, el.MustShape().Box().Y, nil
 }
 
-// PausaHumana cria um intervalo de pouco menos de meio segundo entre cada ação. Extremamente importante para que o navegador não identifique o bot
+// PausaHumana cria um intervalo de pouco menos de meio segundo entre cada ação. Extremamente importante para que o navegador não identifique o -bot-
 // Recebe como argumento 0 ou 1, qualquer outro número faz com que vire 1 (exitação humana)
 // Possui 2 tipos
 //
@@ -135,7 +135,7 @@ func (p *Pagina) PausaHumana(tipo uint8) {
 	}
 }
 
-// Fecha a conexão
+// Fechar a conexão
 func (p *Pagina) Fechar() {
-	p.Close()
+	_ = p.Close()
 }
