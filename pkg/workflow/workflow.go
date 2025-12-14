@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"fmt"
 	"nfse/pkg/config"
 	"nfse/pkg/logger"
 	"nfse/pkg/receita"
@@ -29,6 +30,25 @@ func New(logger *logger.ArquivoLog, cfg config.Config, planilha *sheets.Planilha
 func (w *Workflow) Executar() error {
 	defer w.logger.EncerrarAplicacao()
 	// w.receita.AcessarSiteReceita(w.cfg.Website)
-	w.planilha.ParserDados()
+
+	dadosNotasFiscais, err := w.planilha.PegarDadosDeNotasFiscais()
+	if err != nil {
+		return err
+	}
+	dadosDosClientes, err := w.planilha.ColetarDadosLogin(dadosNotasFiscais)
+	if err != nil {
+		return err
+	}
+
+	// Tirar
+	for i, _ := range dadosDosClientes {
+		fmt.Printf("-------------\nDados:\nNome: %s\nLogin: %s\nSenha: %s\n\nDados emissão: %v\n---------------------\n",
+			dadosDosClientes[i].Empresa,
+			dadosDosClientes[i].Login,
+			dadosDosClientes[i].Senha,
+			dadosDosClientes[i].NotasEmitir)
+	}
+	// Tirar
+
 	return nil
 }
