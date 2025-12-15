@@ -27,10 +27,9 @@ func CriarNavegador(log *logger.ArquivoLog, headless bool) (*Pagina, error) {
 	l.Set("disable-gpu")
 	l.Set("no-sandbox")
 	l.Set("disable-dev-shm-usage")
-
-	// Maior furtividade para automação
 	l.Set("excludeSwitches", "enable-automation")
 	l.Set("useAutomationExtension", "false")
+	l.Set("start-maximized", "true")
 
 	url, err := l.Launch()
 	if err != nil {
@@ -51,9 +50,7 @@ func (p *Pagina) AcessarSite(url string) error {
 	if err := p.Navigate(url); err != nil {
 		return err
 	}
-	p.MustWindowFullscreen()
 	p.MustWaitStable()
-	fmt.Printf("Acessado: %s\n", url)
 	return nil
 }
 
@@ -104,7 +101,7 @@ func (p *Pagina) EscreverComoHumano(HTMLElement string, conteudo string) error {
 }
 
 // LocalizarElemento localiza um elemento na tela. Recebe como parâmetro o tempo de timeout em segundos que poderá demorar e o elemento à se procurar.
-// O correto é que se coloque "." para buscar por classe ou "#" por -ID-.
+// O correto é que se coloque "." para buscar por classe ou "#" por 'ID'.
 //
 // Retorna X e Y de um elemento, ou erro caso falhe em encontrar.
 func (p *Pagina) LocalizarElemento(timeout time.Duration, HTMLElement string) (elX, elY float64, err error) {
@@ -115,8 +112,8 @@ func (p *Pagina) LocalizarElemento(timeout time.Duration, HTMLElement string) (e
 	return el.MustShape().Box().X, el.MustShape().Box().Y, nil
 }
 
-// PausaHumana cria um intervalo de pouco menos de meio segundo entre cada ação. Extremamente importante para que o navegador não identifique o -bot-
-// Recebe como argumento 0 ou 1, qualquer outro número faz com que vire 1 (exitação humana)
+// PausaHumana cria um intervalo de pouco menos de meio segundo entre cada ação. Extremamente importante para que o navegador não identifique o 'bot'
+// Recebe como argumento 0 ou 1, qualquer outro número faz com que vire 1 (hesitação humana)
 // Possui 2 tipos
 //
 // Tipo 0: Delay do dedo descendo e subindo ao apertar um botão

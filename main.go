@@ -7,6 +7,7 @@ import (
 	"nfse/pkg/receita"
 	"nfse/pkg/rod"
 	"nfse/pkg/sheets"
+	"nfse/pkg/ui"
 	"nfse/pkg/workflow"
 	"sync"
 	"time"
@@ -46,13 +47,15 @@ func run() error {
 	}
 	defer pagina.Close()
 
-	receita := receita.New(pagina)
+	rec := receita.New(pagina)
 
-	w := workflow.New(logger, cfg, planilha, pagina, receita)
+	ui := ui.NewUI()
+
+	w := workflow.New(logger, cfg, planilha, pagina, rec, ui)
 	return w.Executar()
 }
 
 func EsperarUmaHora(wg *sync.WaitGroup) {
 	defer wg.Done()
-	time.Sleep(time.Hour)
+	time.Sleep(time.Minute * 30)
 }

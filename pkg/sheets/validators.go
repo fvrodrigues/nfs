@@ -38,3 +38,29 @@ func ParaValor(valor any) string {
 
 	return str
 }
+
+func FormataEmSP(emSP any) bool {
+	if emSP == "" || emSP == nil {
+		return true
+	}
+	emSP = strings.TrimSpace(strings.ToLower(emSP.(string)))
+
+	switch emSP {
+	case "sim", "true", "1", "ok":
+		return true
+	}
+	return false
+}
+
+func FoiTotalmenteEmSP(emSP bool, cidade string) bool {
+	cidade = strings.TrimSpace(strings.ToLower(cidade))
+	cidade = strings.ReplaceAll(cidade, "ã", "a")
+
+	switch cidade {
+	case "sp", "sao paulo", "saopaulo", "s p",
+		"s.p", "s.p.", "s. paulo", "s.paulo",
+		"sao paolo", "san paulo", "sampa":
+		return emSP
+	}
+	return false
+}
