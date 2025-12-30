@@ -1,6 +1,7 @@
 package sheets
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -92,19 +93,14 @@ func (p *Planilha) PegarDadosDeNotasFiscais() (map[string][]Nota, error) {
 	for _, aba := range abas {
 		abaToLower := strings.ToLower(aba)
 		if strings.Contains(abaToLower, "resposta") {
-			fmt.Printf("Pulando aba *%s* pois é de script do forms\n", aba)
+			fmt.Printf("[ . ] Pulando aba *%s* pois é de script do forms\n", aba)
+			continue
+		}
+		if strings.Contains(abaToLower, "logs do") {
+			fmt.Printf("[ . ] Pulando aba *%s* pois é a aba de logs\n", aba)
 			continue
 		}
 		if strings.Contains(abaToLower, "info") {
-			continue
-		}
-
-		linhasComValor, err := p.ContarLinhasNaoVazias(aba)
-		if err != nil {
-			return nil, err
-		}
-		if linhasComValor <= 1 {
-			fmt.Printf("Pulando aba *%s* pois está vazia\n", aba)
 			continue
 		}
 
@@ -114,12 +110,16 @@ func (p *Planilha) PegarDadosDeNotasFiscais() (map[string][]Nota, error) {
 			return nil, err
 		}
 		if len(linhas) <= 1 {
-			fmt.Printf("Aba %s somente possui cabeçalho ou está vazia, pulando...\n", aba)
+			fmt.Printf("[ ! ] Aba %s somente possui cabeçalho ou está vazia, pulando...\n", aba)
 			continue
 		}
 
-		listaNotas, err := p.TrataValoresDasAbas(linhas)
+		listaNotas, err := p.TrataValoresDasAbas(linhas, aba)
 		if err != nil {
+			if errors.Is(err, ErrFaltaColunaObrigatoria) {
+				fmt.Printf("[ ! ] %v\n", err)
+				continue
+			}
 			return nil, err
 		}
 		linhas = linhas[1:]
@@ -131,10 +131,13 @@ func (p *Planilha) PegarDadosDeNotasFiscais() (map[string][]Nota, error) {
 }
 
 // TrataValoresDasAbas recebe uma lista de linhas e retorna uma lista de Nota.
-func (p *Planilha) TrataValoresDasAbas(linhas [][]any) ([]Nota, error) {
+func (p *Planilha) TrataValoresDasAbas(linhas [][]any, aba string) ([]Nota, error) {
 	var notas []Nota
 
 	header := linhas[0]
+	if err := HeaderValido(header, aba); err != nil {
+		return nil, err
+	}
 	indexTomador, indexCnpj, indexValor, indexObservacao, indexEmitido, indexLink, indexEmSP, indexCidade := AtribuiValores(header)
 
 	if err := ValidarIndices(indexTomador, indexCnpj, indexValor, indexObservacao, indexEmitido, indexLink, indexEmSP, indexCidade); err != nil {
@@ -143,7 +146,6 @@ func (p *Planilha) TrataValoresDasAbas(linhas [][]any) ([]Nota, error) {
 
 	for _, linha := range linhas[1:] {
 		if len(linha) == 0 {
-			fmt.Println("Linha vazia, pulando...")
 			continue
 		}
 
@@ -186,10 +188,59 @@ func AcharIndiceColuna(header []any, str string) int {
 			return i
 		}
 	}
-	fmt.Printf("Valor nao encontrado: %s\nHeader usado: %v", str, header)
 	return -1
 }
 
 func AtribuiValores(header []any) (int, int, int, int, int, int, int, int) {
-	return AcharIndiceColuna(header, "tomador"), AcharIndiceColuna(header, "cnpj"), AcharIndiceColuna(header, "valor"), AcharIndiceColuna(header, "obs"), AcharIndiceColuna(header, "emiss"), AcharIndiceColuna(header, "link"), AcharIndiceColuna(header, "em SP"), AcharIndiceColuna(header, "cidade")
+	return AcharIndiceColuna(header, "tomador"),
+		AcharIndiceColuna(header, "cnpj"),
+		AcharIndiceColuna(header, "valor"),
+		AcharIndiceColuna(header, "obs"),
+		AcharIndiceColuna(header, "emiss"),
+		AcharIndiceColuna(header, "link"),
+		AcharIndiceColuna(header, "em SP"),
+		AcharIndiceColuna(header, "cidade")
+}
+
+func HeaderValido(header []any, aba string) error {
+	colunasObrigatorias := map[string]bool{
+		"tomador": false, "cnpj": false, "valor": false, "obs": false, "emissao": false, "link": false, "em sp": false, "cidade": false,
+	}
+	var colunasFaltantes []string
+
+	for _, celula := range header {
+		celulaString := fmt.Sprintf("%v", celula)
+		celulaFormatada := strings.ToLower(strings.TrimSpace(celulaString))
+
+		switch {
+		case strings.Contains(celulaFormatada, "tomador"):
+			colunasObrigatorias["tomador"] = true
+		case strings.Contains(celulaFormatada, "cnpj"):
+			colunasObrigatorias["cnpj"] = true
+		case strings.Contains(celulaFormatada, "valor"):
+			colunasObrigatorias["valor"] = true
+		case strings.Contains(celulaFormatada, "obs"):
+			colunasObrigatorias["obs"] = true
+		case strings.Contains(celulaFormatada, "emiss"):
+			colunasObrigatorias["emissao"] = true
+		case strings.Contains(celulaFormatada, "link"):
+			colunasObrigatorias["link"] = true
+		case strings.Contains(celulaFormatada, "em sp"):
+			colunasObrigatorias["em sp"] = true
+		case strings.Contains(celulaFormatada, "cidade"):
+			colunasObrigatorias["cidade"] = true
+		default:
+			continue
+		}
+	}
+	for colunaObrigatoria, colunaObrigatoriaExiste := range colunasObrigatorias {
+		if !colunaObrigatoriaExiste {
+			colunasFaltantes = append(colunasFaltantes, colunaObrigatoria)
+		}
+	}
+	if len(colunasFaltantes) > 0 {
+		faltantes := fmt.Sprintf("aba %s não possui seguintes colunas:  %v", aba, colunasFaltantes)
+		return fmt.Errorf("%w: %s", ErrFaltaColunaObrigatoria, faltantes) //errors.New(fmt.Sprintf("aba %s faltando colunas: %v", aba, colunasFaltantes))
+	}
+	return nil
 }

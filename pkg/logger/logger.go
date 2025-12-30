@@ -2,7 +2,6 @@ package logger
 
 import (
 	"fmt"
-	"nfse/pkg/errs"
 	"os"
 	"path/filepath"
 	"time"
@@ -64,7 +63,6 @@ func (a *ArquivoLog) Escrever(msg string) error {
 //
 // Caso não consiga escrever, printa o erro
 func (a *ArquivoLog) EscreverErro(action string, erro error) error {
-	erro = errs.Formatar(action, erro)
 	erroFormatado := a.Format(erro)
 
 	if _, err := a.File.WriteString(erroFormatado); err != nil {
@@ -72,22 +70,6 @@ func (a *ArquivoLog) EscreverErro(action string, erro error) error {
 		return err
 	}
 	return erro
-}
-
-// Escreve uma mensagem de erro no arquivo de log, além de matar o programa.
-// Usa a função errs.Formatar da bib interna para formatar a mensagem de erro
-//
-// Caso não consiga escrever, printa o erro
-func (a *ArquivoLog) EscreverMata(action string, erro error) error {
-	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
-	msgFormatada := fmt.Sprintf("[%s] %v\n", dataExata, erro)
-
-	if _, err := a.File.WriteString(msgFormatada); err != nil {
-		fmt.Printf("Erro ao escrever no log: %v\n", err)
-		return err
-	}
-	errs.Mata(action, erro)
-	return nil
 }
 
 // NaoAchaElemento escreve uma mensagem no log e mata o programa.

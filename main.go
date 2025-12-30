@@ -1,8 +1,8 @@
 package main
 
 import (
+	"fmt"
 	"nfse/pkg/config"
-	"nfse/pkg/errs"
 	"nfse/pkg/logger"
 	"nfse/pkg/receita"
 	"nfse/pkg/rod"
@@ -27,7 +27,7 @@ func main() {
 func run() error {
 	logger, err := logger.New()
 	if err != nil {
-		return errs.Formatar("criar pasta /logs ou arquivo de log", err)
+		return fmt.Errorf("%w: %s", "criar pasta /logs ou arquivo de log", err)
 	}
 	defer logger.Fechar()
 

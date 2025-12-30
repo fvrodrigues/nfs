@@ -59,7 +59,7 @@ func (p *Pagina) AcessarSite(url string) error {
 func (p *Pagina) ApertarElemento(HTMLElement string) error {
 	botao, err := p.RetornaElemento(HTMLElement, 5)
 	if err != nil {
-		return fmt.Errorf("Erro ao encontrar elemento %s: %v\n", HTMLElement, err)
+		return fmt.Errorf("Erro ao encontrar elemento %s: %w\n", HTMLElement, err)
 	}
 
 	botao.MustHover()
@@ -89,7 +89,7 @@ func (p *Pagina) RetornaElemento(HTMLElement string, tempo time.Duration) (*rod.
 func (p *Pagina) EscreverComoHumano(HTMLElement string, conteudo string) error {
 	el, err := p.RetornaElemento(HTMLElement, 5)
 	if err != nil {
-		return fmt.Errorf("Erro ao encontrar elemento %s: %v\n", HTMLElement, err)
+		return fmt.Errorf("Erro ao encontrar elemento %s: %w\n", HTMLElement, err)
 	}
 	p.ApertarElementoDefinido(el)
 
