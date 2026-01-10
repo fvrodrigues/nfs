@@ -20,22 +20,28 @@ func New(pagina *rod.Pagina) *Receita {
 }
 
 func (r *Receita) AcessarSiteReceita(url string) error {
-	if err := r.AcessarSite(url); err != nil {
-		return err
+	err := r.AcessarSite(url)
+	if err == nil {
+		return nil
 	}
-	return nil
+
+	if strings.Contains(err.Error(), "ERR_ABORTED") {
+		return fmt.Errorf("%w: sessão abortada ao tentar acessar %s. Tente novamente", ErrSessaoAbortada, url)
+	}
+	return fmt.Errorf("erro genérico ao acessar site %s: %w", url, err)
 }
 
 func (r *Receita) ApertarLoginUnico() error {
-	wait := r.MustWaitNavigation()
-	if err := r.ApertarElemento(".oauth-button"); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) {
-			return fmt.Errorf("%w: %s", ErrNaoEncontrouElemento, "não foi possível encontrar .oauth-button (login único) na página de login, verifique se o mesmo ainda existe.")
-		}
-		return fmt.Errorf("%w:%s", err, "erro inesperado achar campo de login único")
+	err := r.ApertarElemento(".oauth-button")
+	if err == nil {
+		r.MustWaitStable()
+		return nil
 	}
-	wait()
-	return nil
+
+	if strings.Contains(err.Error(), "deadline exceeded") {
+		return fmt.Errorf("%w: %s", ErrNaoEncontrouElemento, "não foi possível encontrar .oauth-button (login único) na página de login, verifique se o mesmo ainda existe.")
+	}
+	return fmt.Errorf("%w:%s", err, "erro inesperado achar campo de login único")
 }
 
 func (r *Receita) FazerLogin(cpfCnpj, senha string) error {
@@ -53,15 +59,19 @@ func (r *Receita) FazerLogin(cpfCnpj, senha string) error {
 	}
 
 	if err := r.ApertarElemento(".btn-entrar"); err != nil {
-		return err
+		if strings.Contains(err.Error(), "deadline exceeded") {
+			return fmt.Errorf("%w: %s", ErrNaoEncontrouElemento, "não foi possível encontrar .btn-entrar (botão 'Entrar') na página de login, verifique se o mesmo ainda existe.")
+		}
+		return fmt.Errorf("%w:%s", err, "erro inesperado ao tentar fazer login")
 	}
 	time.Sleep(600 * time.Millisecond)
+	r.MustWaitStable()
 
 	url := strings.TrimSpace(strings.ToLower(r.Pagina.MustInfo().URL))
 	temErroNaTela, _, _ := r.Pagina.Has(".text-danger")
 
 	// Retorna erro se a url continuar com essa rota ou se o <span> de erro com classe ".text-danger" existir
-	if strings.Contains(url, "account/login?ReturnUrl=") || temErroNaTela {
+	if strings.Contains(url, "account/login?returnurl=") || temErroNaTela {
 		return fmt.Errorf("%w: %s", ErrDadosLoginInvalidos, "dados de login inválidos")
 	}
 
@@ -73,10 +83,27 @@ func (r *Receita) FazerLogin(cpfCnpj, senha string) error {
 
 func (r *Receita) Deslogar() error {
 	r.PausaHumana(2)
-	wait := r.MustWaitNavigation()
+
 	if err := r.ApertarElemento(".oauth-sair"); err != nil {
-		return err
+		fmt.Printf("Não foi possível encontrar o elemento .ouath-sair para deslogar, verifique se o mesmo ainda existe. Tentando deslogar manualmente, o que pode alertar da automação\n")
 	}
-	wait()
+	_ = r.WaitStable(2 * time.Second)
+
+	time.Sleep(5 * time.Second)
+	url := strings.TrimSpace(strings.ToLower(r.Pagina.MustInfo().URL))
+	if !strings.Contains(url, "notadomilhao.sf.") {
+		fmt.Printf("Saindo manualmente com JS.\n")
+
+		_, err := r.Eval(`__doPostBack('ctl00$HeaderV2$oauthLogout$Sair','')`)
+		if err != nil {
+			return fmt.Errorf("%w: %s", ErrNaoEncontrouElemento, "não foi possível sair manualmente usando o JavaScript da página.")
+		}
+		_ = r.WaitStable(2 * time.Second)
+	}
+
+	//Verifica novamente se não deu certo. Possivelmente uma das piores e mais redundantes linhas de código que já escrevi na vida, mas o site do governo não me ajuda.
+	if !strings.Contains(url, "notadomilhao.sf.") {
+		return fmt.Errorf("%w: %s", ErrNaoCarregaNovaPagina, "não foi possível deslogar")
+	}
 	return nil
 }

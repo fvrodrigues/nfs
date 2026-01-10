@@ -3,7 +3,9 @@ package sheets
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
+	"time"
 )
 
 // Cliente é a struct com todos os valores de 'login' e notas para emitir sanitizados e prontos para usar.
@@ -23,6 +25,7 @@ type Nota struct {
 	Observacao string
 	EmSP       bool
 	Cidade     string
+	Data       string
 
 	Emitido bool
 	Link    string
@@ -138,7 +141,7 @@ func (p *Planilha) TrataValoresDasAbas(linhas [][]any, aba string) ([]Nota, erro
 	if err := HeaderValido(header, aba); err != nil {
 		return nil, err
 	}
-	indexTomador, indexCnpj, indexValor, indexObservacao, indexEmitido, indexLink, indexEmSP, indexCidade := AtribuiValores(header)
+	indexTomador, indexCnpj, indexValor, indexObservacao, indexEmitido, indexLink, indexEmSP, indexCidade, indexData := AtribuiValores(header)
 
 	if err := ValidarIndices(indexTomador, indexCnpj, indexValor, indexObservacao, indexEmitido, indexLink, indexEmSP, indexCidade); err != nil {
 		return nil, err
@@ -158,7 +161,17 @@ func (p *Planilha) TrataValoresDasAbas(linhas [][]any, aba string) ([]Nota, erro
 			link       = ParaStr(linha[indexLink])
 			emSP       = FormataEmSP(linha[indexEmSP])
 			cidade     = ParaStr(linha[indexCidade])
+			data       = ParaStr(linha[indexData])
 		)
+
+		data, ok := ParseData(data)
+		if !ok {
+			data = time.Now().Format("02/01/2006")
+		}
+		// Como alguns campos podem ficar vazios, se a lógica abaixo não existir essa função vai retornar um monte de notas com valores vazios e true/falses aleatórios.
+		if valor == "" || cnpj == "" {
+			continue
+		}
 
 		if !emitido && link == "" /*&& FoiTotalmenteEmSP(emSP, cidade)*/ {
 			linha := Nota{
@@ -170,6 +183,7 @@ func (p *Planilha) TrataValoresDasAbas(linhas [][]any, aba string) ([]Nota, erro
 				Link:       link,
 				EmSP:       emSP,
 				Cidade:     cidade,
+				Data:       data,
 			}
 			notas = append(notas, linha)
 		}
@@ -191,7 +205,7 @@ func AcharIndiceColuna(header []any, str string) int {
 	return -1
 }
 
-func AtribuiValores(header []any) (int, int, int, int, int, int, int, int) {
+func AtribuiValores(header []any) (int, int, int, int, int, int, int, int, int) {
 	return AcharIndiceColuna(header, "tomador"),
 		AcharIndiceColuna(header, "cnpj"),
 		AcharIndiceColuna(header, "valor"),
@@ -199,12 +213,13 @@ func AtribuiValores(header []any) (int, int, int, int, int, int, int, int) {
 		AcharIndiceColuna(header, "emiss"),
 		AcharIndiceColuna(header, "link"),
 		AcharIndiceColuna(header, "em SP"),
-		AcharIndiceColuna(header, "cidade")
+		AcharIndiceColuna(header, "cidade"),
+		AcharIndiceColuna(header, "data")
 }
 
 func HeaderValido(header []any, aba string) error {
 	colunasObrigatorias := map[string]bool{
-		"tomador": false, "cnpj": false, "valor": false, "obs": false, "emissao": false, "link": false, "em sp": false, "cidade": false,
+		"tomador": false, "cnpj": false, "valor": false, "obs": false, "emissao": false, "link": false, "em sp": false, "cidade": false, "data": false,
 	}
 	var colunasFaltantes []string
 
@@ -229,6 +244,8 @@ func HeaderValido(header []any, aba string) error {
 			colunasObrigatorias["em sp"] = true
 		case strings.Contains(celulaFormatada, "cidade"):
 			colunasObrigatorias["cidade"] = true
+		case strings.Contains(celulaFormatada, "data"):
+			colunasObrigatorias["data"] = true
 		default:
 			continue
 		}
@@ -243,4 +260,16 @@ func HeaderValido(header []any, aba string) error {
 		return fmt.Errorf("%w: %s", ErrFaltaColunaObrigatoria, faltantes) //errors.New(fmt.Sprintf("aba %s faltando colunas: %v", aba, colunasFaltantes))
 	}
 	return nil
+}
+
+func DataEhValida(data string) bool {
+	return regexp.MustCompile(`^\d{2}/\d{2}/\d{4}$`).MatchString(data)
+}
+
+func ParseData(dataStr string) (string, bool) {
+	data, err := time.Parse("02/01/2006", dataStr)
+	if err != nil {
+		return "", false
+	}
+	return data.Format("02/01/2006"), true
 }

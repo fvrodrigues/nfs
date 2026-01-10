@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/go-rod/stealth"
@@ -48,7 +49,7 @@ func CriarNavegador(log *logger.ArquivoLog, headless bool) (*Pagina, error) {
 // AcessarSite Com um navegador e página já instanciados
 func (p *Pagina) AcessarSite(url string) error {
 	if err := p.Navigate(url); err != nil {
-		return err
+		return fmt.Errorf("erro ao acessar site %s: %w", url, err)
 	}
 	p.MustWaitStable()
 	return nil
@@ -59,7 +60,7 @@ func (p *Pagina) AcessarSite(url string) error {
 func (p *Pagina) ApertarElemento(HTMLElement string) error {
 	botao, err := p.RetornaElemento(HTMLElement, 5)
 	if err != nil {
-		return fmt.Errorf("Erro ao encontrar elemento %s: %w\n", HTMLElement, err)
+		return fmt.Errorf("erro ao encontrar elemento %s: %w\n", HTMLElement, err)
 	}
 
 	botao.MustHover()
@@ -89,13 +90,27 @@ func (p *Pagina) RetornaElemento(HTMLElement string, tempo time.Duration) (*rod.
 func (p *Pagina) EscreverComoHumano(HTMLElement string, conteudo string) error {
 	el, err := p.RetornaElemento(HTMLElement, 5)
 	if err != nil {
-		return fmt.Errorf("Erro ao encontrar elemento %s: %w\n", HTMLElement, err)
+		return fmt.Errorf("erro ao encontrar elemento %s: %w\n", HTMLElement, err)
 	}
 	p.ApertarElementoDefinido(el)
 
 	for _, char := range conteudo {
 		p.PausaHumana(1)
 		el.MustInput(string(char))
+	}
+	return nil
+}
+
+func (p *Pagina) DigitarTecladoComoHumano(HTMLElement string, conteudo string) error {
+	el, err := p.RetornaElemento(HTMLElement, 5)
+	if err != nil {
+		return fmt.Errorf("erro ao encontrar elemento %s: %w\n", HTMLElement, err)
+	}
+	p.ApertarElementoDefinido(el)
+
+	for _, char := range conteudo {
+		p.PausaHumana(1)
+		p.Keyboard.MustType(input.Key(char))
 	}
 	return nil
 }
