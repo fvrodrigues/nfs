@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"nfse/pkg/config"
 	"nfse/pkg/logger"
 	"nfse/pkg/receita"
@@ -14,14 +15,22 @@ import (
 )
 
 func main() {
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {})
+
+	// Apagar depois que tudo tiver pronto
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go EsperarUmaHora(&wg)
+	// --------
 
 	if err := run(); err != nil {
 		panic(err)
 	}
+
+	// --------
 	wg.Wait()
+	// --------
 }
 
 func run() error {
