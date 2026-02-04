@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"nfse/pkg/config"
+	"nfse/pkg/handlers"
 	"nfse/pkg/logger"
-	"nfse/pkg/receita"
-	"nfse/pkg/rod"
 	"nfse/pkg/sheets"
 	"nfse/pkg/ui"
 	"nfse/pkg/workflow"
@@ -15,8 +14,6 @@ import (
 )
 
 func main() {
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {})
 
 	// Apagar depois que tudo tiver pronto
 	var wg sync.WaitGroup
@@ -50,18 +47,18 @@ func run() error {
 		return logger.EscreverErro("criar conexão com a API do Google Sheets", err)
 	}
 
-	pagina, err := rod.CriarNavegador(logger, false)
-	if err != nil {
-		return logger.EscreverErro("criar instância de navegador", err)
-	}
-	defer pagina.Close()
-
-	rec := receita.New(pagina)
-
 	ui := ui.NewUI()
 
-	w := workflow.New(logger, cfg, planilha, pagina, rec, ui)
-	return w.Executar()
+	w := workflow.New(logger, cfg, planilha, ui)
+	handler := handlers.NewPrestadorHandler(w)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/prestador", handler.Handle)
+	fmt.Println("Servidor rodando na porta 8080")
+
+	server := &http.Server{Addr: ":8080", Handler: mux}
+
+	return server.ListenAndServe()
 }
 
 func EsperarUmaHora(wg *sync.WaitGroup) {
