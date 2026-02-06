@@ -23,8 +23,7 @@ type Pagina struct {
 // CriarNavegador cria uma instância do navegador configurado para a automação e inicia o logger.
 // Se true, navegador virá headless
 func CriarNavegador(log *logger.ArquivoLog, headless bool) (*Pagina, error) {
-
-	l := launcher.New().Headless(headless).Devtools(true)
+	l := launcher.New().Headless(headless).Devtools(false)
 	l.Set("disable-gpu")
 	l.Set("no-sandbox")
 	l.Set("disable-dev-shm-usage")
@@ -39,6 +38,7 @@ func CriarNavegador(log *logger.ArquivoLog, headless bool) (*Pagina, error) {
 
 	browser := rod.New().ControlURL(url).NoDefaultDevice().MustConnect()
 	page := stealth.MustPage(browser)
+
 	return &Pagina{
 		Log:       log,
 		Navegador: browser,
@@ -48,6 +48,7 @@ func CriarNavegador(log *logger.ArquivoLog, headless bool) (*Pagina, error) {
 
 // AcessarSite Com um navegador e página já instanciados
 func (p *Pagina) AcessarSite(url string) error {
+
 	if err := p.Navigate(url); err != nil {
 		return fmt.Errorf("erro ao acessar site %s: %w", url, err)
 	}
@@ -58,7 +59,7 @@ func (p *Pagina) AcessarSite(url string) error {
 // ApertarElemento usa a própria bib rod para fazer movimentos humanos e clicar em um botao ou elemento especificado
 // Recebe HTMLElement como argumento.
 func (p *Pagina) ApertarElemento(HTMLElement string) error {
-	botao, err := p.RetornaElemento(HTMLElement, 5)
+	botao, err := p.RetornaElemento(HTMLElement, 2)
 	if err != nil {
 		return fmt.Errorf("erro ao encontrar elemento %s: %w\n", HTMLElement, err)
 	}
@@ -145,6 +146,14 @@ func (p *Pagina) PausaHumana(tipo uint8) {
 	default:
 		time.Sleep(time.Duration(rand.Intn(300)+100) * time.Millisecond)
 	}
+}
+
+func (p *Pagina) DefinirPastaDownload(path string) error {
+	err := proto.BrowserSetDownloadBehavior{Behavior: proto.BrowserSetDownloadBehaviorBehaviorAllow, DownloadPath: path}.Call(p)
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrConfigurarPastaDownloadDefault, err)
+	}
+	return nil
 }
 
 // Fechar a conexão

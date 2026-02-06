@@ -1,6 +1,10 @@
 package config
 
 import (
+	"nfse/pkg/sistema"
+	"path/filepath"
+	"strings"
+
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
 )
@@ -10,12 +14,18 @@ type Config struct {
 	Website string `env:"SITE,required"`
 }
 
-func Load() (cfg Config, err error) {
-	if err = godotenv.Load(); err != nil {
-		return
+func Load() (Config, error) {
+	var cfg Config
+	caminhoDotEnv := filepath.Join(sistema.PathRaiz, "../.env")
+	err := godotenv.Load(caminhoDotEnv)
+	if err != nil {
+		if strings.Contains(err.Error(), "no such file or directory") {
+			return cfg, ErrDotEnvNaoEncontrado
+		}
+		return cfg, err
 	}
 	if err = env.Parse(&cfg); err != nil {
-		return
+		return cfg, err
 	}
-	return
+	return cfg, nil
 }

@@ -3,36 +3,15 @@ package sheets
 import (
 	"errors"
 	"fmt"
-	"regexp"
+	"nfse/pkg/domain"
 	"strings"
 	"time"
 )
 
-// Cliente é a struct com todos os valores de 'login' e notas para emitir sanitizados e prontos para usar.
-type Cliente struct {
-	Empresa string
+// Prestador é a struct com todos os valores de 'login' e notas para emitir sanitizados e prontos para usar.
 
-	Login string
-	Senha string
-
-	NotasEmitir []Nota
-}
-
-type Nota struct {
-	Tomador    string
-	Cnpj       string
-	Valor      string
-	Observacao string
-	EmSP       bool
-	Cidade     string
-	Data       string
-
-	Emitido bool
-	Link    string
-}
-
-func (p *Planilha) ColetarDadosLogin(notas map[string][]Nota) ([]Cliente, error) {
-	var clientes []Cliente
+func (p *Planilha) ColetarDadosLogin(notas map[string][]domain.Nota) ([]domain.Prestador, error) {
+	var prestadores []domain.Prestador
 	linhas, err := p.Ler("info!A:C")
 	if err != nil {
 		return nil, err
@@ -66,8 +45,8 @@ func (p *Planilha) ColetarDadosLogin(notas map[string][]Nota) ([]Cliente, error)
 					achouEmpresa = true
 					break
 				}
-				clientes = append(clientes, Cliente{
-					Empresa:     linha[0].(string),
+				prestadores = append(prestadores, domain.Prestador{
+					Prestador:   linha[0].(string),
 					Login:       linha[1].(string),
 					Senha:       linha[2].(string),
 					NotasEmitir: dadosNotas})
@@ -82,12 +61,12 @@ func (p *Planilha) ColetarDadosLogin(notas map[string][]Nota) ([]Cliente, error)
 		}
 
 	}
-	return clientes, nil
+	return prestadores, nil
 }
 
 // PegarDadosDeNotasFiscais lê os dados de todas as abas e os coloca na struct Nota, além de fazer o parse para o tipo correto de dado.
-func (p *Planilha) PegarDadosDeNotasFiscais() (map[string][]Nota, error) {
-	var notas = map[string][]Nota{}
+func (p *Planilha) PegarDadosDeNotasFiscais() (map[string][]domain.Nota, error) {
+	var notas = map[string][]domain.Nota{}
 	abas, err := p.ListarAbas()
 	if err != nil {
 		return nil, err
@@ -134,8 +113,8 @@ func (p *Planilha) PegarDadosDeNotasFiscais() (map[string][]Nota, error) {
 }
 
 // TrataValoresDasAbas recebe uma lista de linhas e retorna uma lista de Nota.
-func (p *Planilha) TrataValoresDasAbas(linhas [][]any, aba string) ([]Nota, error) {
-	var notas []Nota
+func (p *Planilha) TrataValoresDasAbas(linhas [][]any, aba string) ([]domain.Nota, error) {
+	var notas []domain.Nota
 
 	header := linhas[0]
 	if err := HeaderValido(header, aba); err != nil {
@@ -159,8 +138,6 @@ func (p *Planilha) TrataValoresDasAbas(linhas [][]any, aba string) ([]Nota, erro
 			observacao = ParaStr(linha[indexObservacao])
 			emitido    = ParaBool(linha[indexEmitido])
 			link       = ParaStr(linha[indexLink])
-			emSP       = FormataEmSP(linha[indexEmSP])
-			cidade     = ParaStr(linha[indexCidade])
 			data       = ParaStr(linha[indexData])
 		)
 
@@ -174,15 +151,13 @@ func (p *Planilha) TrataValoresDasAbas(linhas [][]any, aba string) ([]Nota, erro
 		}
 
 		if !emitido && link == "" /*&& FoiTotalmenteEmSP(emSP, cidade)*/ {
-			linha := Nota{
+			linha := domain.Nota{
 				Tomador:    tomador,
 				Cnpj:       cnpj,
 				Valor:      valor,
 				Observacao: observacao,
 				Emitido:    emitido,
 				Link:       link,
-				EmSP:       emSP,
-				Cidade:     cidade,
 				Data:       data,
 			}
 			notas = append(notas, linha)
@@ -260,10 +235,6 @@ func HeaderValido(header []any, aba string) error {
 		return fmt.Errorf("%w: %s", ErrFaltaColunaObrigatoria, faltantes) //errors.New(fmt.Sprintf("aba %s faltando colunas: %v", aba, colunasFaltantes))
 	}
 	return nil
-}
-
-func DataEhValida(data string) bool {
-	return regexp.MustCompile(`^\d{2}/\d{2}/\d{4}$`).MatchString(data)
 }
 
 func ParseData(dataStr string) (string, bool) {

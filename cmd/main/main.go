@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"nfse/pkg/config"
@@ -14,42 +15,34 @@ import (
 )
 
 func main() {
-
-	// Apagar depois que tudo tiver pronto
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go EsperarUmaHora(&wg)
-	// --------
-
 	if err := run(); err != nil {
 		panic(err)
 	}
-
-	// --------
-	wg.Wait()
-	// --------
 }
 
 func run() error {
-	logger, err := logger.New()
+	log, err := logger.New()
 	if err != nil {
 		return fmt.Errorf("%w: %s", "criar pasta /logs ou arquivo de log", err)
 	}
-	defer logger.Fechar()
+	defer log.Fechar()
 
 	cfg, err := config.Load()
 	if err != nil {
-		return logger.EscreverErro("ler informações do arquivo .env", err)
+		if errors.Is(err, config.ErrDotEnvNaoEncontrado) {
+			return log.EscreverErro("", err)
+		}
+		return log.EscreverErro("ler informações do arquivo .env", err)
 	}
 
-	planilha := sheets.NovaPlanilha(logger, cfg.SheetID)
+	planilha := sheets.NovaPlanilha(log, cfg.SheetID)
 	if err := planilha.NewService(); err != nil {
-		return logger.EscreverErro("criar conexão com a API do Google Sheets", err)
+		return log.EscreverErro("criar conexão com a API do Google Sheets", err)
 	}
 
-	ui := ui.NewUI()
+	uInterface := ui.NewUI()
 
-	w := workflow.New(logger, cfg, planilha, ui)
+	w := workflow.New(log, cfg, planilha, uInterface)
 	handler := handlers.NewPrestadorHandler(w)
 
 	mux := http.NewServeMux()
@@ -61,7 +54,9 @@ func run() error {
 	return server.ListenAndServe()
 }
 
-func EsperarUmaHora(wg *sync.WaitGroup) {
+func EsperarParaSempre(wg *sync.WaitGroup) {
 	defer wg.Done()
-	time.Sleep(time.Minute * 30)
+	for {
+		time.Sleep(time.Hour * 100)
+	}
 }

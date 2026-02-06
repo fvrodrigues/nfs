@@ -3,6 +3,7 @@ package sheets
 import (
 	"context"
 	"fmt"
+	"nfse/pkg/domain"
 	"nfse/pkg/logger"
 
 	"google.golang.org/api/sheets/v4"
@@ -15,7 +16,7 @@ type Planilha struct {
 	Log *logger.ArquivoLog
 
 	Linhas      uint32
-	FaltaEmitir map[string][]Nota
+	FaltaEmitir map[string][]domain.Nota
 }
 
 func NovaPlanilha(l *logger.ArquivoLog, spreadSheetID string) *Planilha {

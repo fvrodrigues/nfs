@@ -2,6 +2,7 @@ package logger
 
 import (
 	"fmt"
+	"nfse/pkg/sistema"
 	"os"
 	"path/filepath"
 	"time"
@@ -18,15 +19,14 @@ func New() (*ArquivoLog, error) {
 	// Variável que guarda a hora e datas exatos
 	hora := time.Now()
 
-	// Cria o caminho absoluto para a pasta para qualquer OS que esteja executando e nomeia o arquivo
-	nomePasta := "logs"
-	nomeArquivo := fmt.Sprintf("nfse_%v.log", hora.Format("02-01-2006_15-04-05"))
-	caminho := filepath.Join(nomePasta, nomeArquivo)
+	arquivoNome := fmt.Sprintf("nfse_%v.log", hora.Format("02-01-2006_15-04-05"))
 
-	if err := os.MkdirAll(nomePasta, 0755); err != nil {
+	pastaLogs, err := sistema.CriarPasta("logs")
+	if err != nil {
 		return nil, err
 	}
 
+	caminho := filepath.Join(pastaLogs, arquivoNome)
 	arquivo, err := os.OpenFile(caminho, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func New() (*ArquivoLog, error) {
 
 	return &ArquivoLog{
 		arquivo,
-		nomeArquivo,
+		arquivoNome,
 		caminho,
 	}, nil
 }
@@ -58,7 +58,7 @@ func (a *ArquivoLog) Escrever(msg string) error {
 	return nil
 }
 
-// Escreve uma mensagem de erro no arquivo de log.
+// EscreverErro Escreve uma mensagem de erro no arquivo de log.
 // Usa a função errs.Formatar da bib interna para formatar a mensagem de erro
 //
 // Caso não consiga escrever, printa o erro

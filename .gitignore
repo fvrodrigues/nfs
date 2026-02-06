@@ -5,6 +5,8 @@
 nfse
 .dll
 .exe
+bin/*
+!bin/.gitkeep
 
 #Ignora arquivos gerados pelo vscode ou Goland
 .vscode
@@ -14,8 +16,8 @@ nfse
 logs/
 /.TESTES_nao-coloque-no-github
 
-#Ignora todos as pastas credentials/, das quais serão usadas para guardar informações secretas
-credentials/
-
 #Ignora código antigo
 bot*
+
+#Ignora credenciais importantes
+service_account.json

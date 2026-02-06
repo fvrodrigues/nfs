@@ -2,62 +2,104 @@ package receita
 
 import (
 	"fmt"
-	"strings"
 	"time"
+
+	"github.com/go-rod/rod/lib/proto"
 )
 
-func (r *Receita) ApertarBotaoEmissao() error {
-	const seletorOpcaoEmitir = "#ctl00_body_ddlApelido" // Elemento que somente existe em nota.aspx
-
-	_ = r.ApertarElemento(seletorOpcaoEmitir)
-
+func (r *Receita) IrParaFormsEmissao() error {
 	err := r.AcessarSite("https://nfe.prefeitura.sp.gov.br/contribuinte/nota.aspx")
 	if err != nil {
 		return err
 	}
-	r.MustWaitStable()
 
-	if url := r.Pagina.MustInfo().URL; !strings.Contains(url, "nota.aspx") {
-		return fmt.Errorf("%w: a página atual não contém 'nota.aspx' em sua URL, o que signficia que não foi possível entrar na página de emissão de NFSe", ErrNaoCarregaNovaPagina)
-	}
-
-	if err := r.Timeout(5*time.Second).WaitElementsMoreThan(seletorOpcaoEmitir, 0); err != nil {
-		return fmt.Errorf("%w: não foi encontrada na página atual o elemento %s, o que significa que a página ainda é a principal", ErrNaoCarregaNovaPagina, seletorOpcaoEmitir)
+	if err := r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond); err != nil {
+		return fmt.Errorf("%w: não foi possível carregar forms de emissão", ErrNaoCarregaNovaPagina)
 	}
 
 	return nil
 }
 
 func (r *Receita) ColocaCnpjEData(cnpj, data string) error {
-	err := r.DigitarTecladoComoHumano("#ctl00_body_tbCPFCNPJTomador", cnpj)
-	if err != nil {
-		if strings.Contains(err.Error(), "deadline exceeded") {
-			return fmt.Errorf("%s:%w", "não foi possível encontrar #ctl00_body_tbCPFCNPJTomador (input de cnpj) na página de emissão, verifique se o mesmo ainda existe.", ErrNaoEncontrouElemento)
-		}
-		return fmt.Errorf("%s:%w", "erro inesperado ao tentar digitar cnpj do tomador", err)
+	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbCPFCNPJTomador", cnpj); err != nil {
+		return r.wrapErrorApertarElemento(err, "#ctl00_body_tbCPFCNPJTomador", "digitar cnpj")
 	}
 
-	data = r.DataParaDigitar(data)
-	err = r.DigitarTecladoComoHumano("#ctl00_body_txtEmitidoEm", data)
-	if err != nil {
-		if strings.Contains(err.Error(), "deadline exceeded") {
-			return fmt.Errorf("%s:%w", "não foi possível encontrar #ctl00_body_txtEmitidoEm (input de data) na página de emissão, verifique se o mesmo ainda existe.", ErrNaoEncontrouElemento)
-		}
-		return fmt.Errorf("%s:%w", "erro inesperado ao tentar data prestação do serviço", err)
+	data = r.DataParaDigitarComoHumano(data)
+	if err := r.DigitarTecladoComoHumano("#ctl00_body_txtEmitidoEm", data); err != nil {
+		return r.wrapErrorApertarElemento(err, "#ctl00_body_txtEmitidoEm", "digitar data")
 	}
 
-	err = r.ApertarElemento("#ctl00_body_btAvancar")
-	if err != nil {
-		if strings.Contains(err.Error(), "deadline exceeded") {
-			return fmt.Errorf("%s:%w", "não foi possível encontrar #ctl00_body_btAvancar (botão de avançar página) na página de emissão, verifique se o mesmo ainda existe.", ErrNaoEncontrouElemento)
-		}
-		return fmt.Errorf("%s:%w", "erro inesperado ao tentar avançar", err)
+	if err := r.ApertarElemento("#ctl00_body_btAvancar"); err != nil {
+		return r.wrapErrorApertarElemento(err, "ctl00_body_btAvancar", "avançar página")
 	}
-	r.MustWaitStable()
+
+	// Evita o 'bug' das datas. erroData somente vai existir e fazer a condição ser true se o 'bug' ocorrer
+	if _, err := r.Timeout(400 * time.Millisecond).Element("#ctl00_body_lblMensagem"); err == nil {
+		if err := r.ApertarElemento("#ctl00_body_rbVersao1"); err != nil {
+			return r.wrapErrorApertarElemento(err, "#ctl00_body_rbVersao1", "selecionar Versão 1 - ISS apenas")
+		}
+
+		if err := r.ApertarElemento("#ctl00_body_btAvancar"); err != nil {
+			return r.wrapErrorApertarElemento(err, "ctl00_body_btAvancar", "avançar página")
+		}
+	}
+
+	if err := r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond); err != nil {
+		return fmt.Errorf("%w:%s", ErrNaoCarregaNovaPagina, "não foi possível carregar página com forms para emissão")
+	}
 	return nil
 }
 
-func (r *Receita) DataParaDigitar(data string) string {
-	slData := strings.Split(data, "/")
-	return fmt.Sprintf("%s%s%s", slData[0], slData[1], slData[2])
+func (r *Receita) ColocarDadosEEmitirNF(nome, obs, valor string) error {
+	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbRazaoSocial", nome); err != nil {
+		return r.wrapErrorApertarElemento(err, "#ctl00_body_tbRazaoSocial", "digitar nome do tomador")
+	}
+
+	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbDiscriminacao", obs); err != nil {
+		return r.wrapErrorApertarElemento(err, "ctl00_body_tbDiscriminacao", "colocar discriminação do serviço")
+	}
+
+	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbValor", valor); err != nil {
+		return r.wrapErrorApertarElemento(err, "#ctl00_body_tbValor", "digitar valor da NF")
+	}
+
+	if err := r.ApertarDialogEmitir(); err != nil {
+		return r.wrapErrorApertarElemento(err, "#ctl00_body_btEmitir", "emitir nota")
+	}
+
+	wait := r.Page.WaitNavigation(proto.PageLifecycleEventNameLoad)
+	if err := r.ApertarElemento("#btDownload"); err != nil {
+		return r.wrapErrorApertarElemento(err, "#btDownload", "download de NF")
+	}
+	wait()
+
+	return nil
+}
+
+func (r *Receita) VoltarParaFormDeNota() error {
+	r.PausaHumana(2)
+
+	wait := r.Page.WaitNavigation(proto.PageLifecycleEventNameLoad)
+	if err := r.ApertarElemento("#ctl00_cphBase_btVoltar"); err != nil {
+		return r.wrapErrorApertarElemento(err, "#ctl00_cphBase_btVoltar", "voltar para form de cpf e data")
+	}
+	wait()
+	return nil
+}
+
+func (r *Receita) ApertarDialogEmitir() error {
+	r.PausaHumana(2)
+
+	// Espera window.confirm do JS que aparece ao apertar botão de emitir e confirma emissão
+	wait, handle := r.MustHandleDialog()
+	go func() {
+		wait()
+		handle(true, "")
+	}()
+	if err := r.ApertarElemento("#ctl00_body_btEmitir"); err != nil {
+		return err
+	}
+
+	return nil
 }
