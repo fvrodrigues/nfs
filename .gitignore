@@ -14,6 +14,7 @@ bin/*
 
 #Ignora qualquer pasta com nome logs e a pasta de testes de API que uso com pequenos projetos para testes
 logs/
+NFs/
 /.TESTES_nao-coloque-no-github
 
 #Ignora código antigo
@@ -21,3 +22,6 @@ bot*
 
 #Ignora credenciais importantes
 service_account.json
+
+#Ignora arquivo local
+.text.txt
