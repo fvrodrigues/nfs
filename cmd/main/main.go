@@ -1,10 +1,8 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
-	"nfse/pkg/config"
 	"nfse/pkg/handlers"
 	"nfse/pkg/logger"
 	"nfse/pkg/sheets"
@@ -23,26 +21,18 @@ func main() {
 func run() error {
 	log, err := logger.New()
 	if err != nil {
-		return fmt.Errorf("%w: %s", "criar pasta /logs ou arquivo de log", err)
+		return fmt.Errorf("%s: %w", "criar pasta /logs ou arquivo de log", err)
 	}
 	defer log.Fechar()
 
-	cfg, err := config.Load()
-	if err != nil {
-		if errors.Is(err, config.ErrDotEnvNaoEncontrado) {
-			return log.EscreverErro("", err)
-		}
-		return log.EscreverErro("ler informações do arquivo .env", err)
-	}
-
-	planilha := sheets.NovaPlanilha(log, cfg.SheetID)
+	planilha := sheets.NovaPlanilha(log, "1eLIdvPoR_X-SW5nKd7fu7mN4i6qp5au55iNYAA8jt9Q")
 	if err := planilha.NewService(); err != nil {
 		return log.EscreverErro("criar conexão com a API do Google Sheets", err)
 	}
 
 	uInterface := ui.NewUI()
 
-	w := workflow.New(log, cfg, planilha, uInterface)
+	w := workflow.New(log, planilha, uInterface)
 	handler := handlers.NewPrestadorHandler(w)
 
 	mux := http.NewServeMux()
