@@ -9,9 +9,8 @@ import (
 )
 
 type ArquivoLog struct {
-	File    *os.File
+	Arquivo *os.File
 	Nome    string
-	Caminho string
 }
 
 // New Cria um arquivo de log na pasta /logs com o formato de nome "nfse_dia-mes-ano_hora-minuto-segundo" e retorna o mesmo
@@ -21,69 +20,86 @@ func New() (*ArquivoLog, error) {
 
 	arquivoNome := fmt.Sprintf("nfse_%v.log", hora.Format("02-01-2006_15-04-05"))
 
-	pastaLogs, err := sistema.CriarPasta("logs")
-	if err != nil {
-		return nil, err
-	}
+	pastaLogs, err := sistema.CriarPastaNaRaiz("logs")
 
 	caminho := filepath.Join(pastaLogs, arquivoNome)
-	arquivo, err := os.OpenFile(caminho, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	arquivo, err := os.OpenFile(caminho, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0500)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w:%w", ErrCriarArquivoLog, err)
 	}
 
 	return &ArquivoLog{
 		arquivo,
 		arquivoNome,
-		caminho,
 	}, nil
 }
 
-// Format formata a mensagem em formato de log
-func (a *ArquivoLog) Format(msg any) (msgFormatada string) {
+// format formata a mensagem em formato de log
+func (a *ArquivoLog) format(msg string, args ...any) string {
+	msg = fmt.Sprintf(msg, args...)
 	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
-	msgFormatada = fmt.Sprintf("[%s] %s\n", dataExata, msg)
-	return
+	return fmt.Sprintf("[%s] %s\n", dataExata, msg)
 }
 
-// Escrever uma mensagem no arquivo de log.
+func (a *ArquivoLog) formatErro(erro error) string {
+	dataExata := time.Now().Format("02-01-2006 15:04:05.000")
+	return fmt.Sprintf("[%s] [ ERRO ] %s\n", dataExata, erro.Error())
+}
+
+func (a *ArquivoLog) LogInicio(horario string) {
+	msg := fmt.Sprintf("[%s] Aplicação iniciada\n", horario)
+	if _, err := a.Arquivo.WriteString(msg); err != nil {
+		fmt.Println(a.format("[ IMPORTANTE NÃO FATAL ] Logger falhou em iniciar %v:%v\n", ErrEscritaArquivo, err))
+	}
+}
+
+// EscreverMensagem uma mensagem no arquivo de log.
 //
 // Caso não consiga escrever, printa o erro
-func (a *ArquivoLog) Escrever(msg string) error {
-	msg = a.Format(msg)
-	if _, err := a.File.WriteString(msg); err != nil {
-		fmt.Printf("Erro ao escrever no log: %v\n", err)
-		return err
+func (a *ArquivoLog) EscreverMensagem(msg string, args ...any) {
+	msg = a.format(msg, args...)
+	if _, err := a.Arquivo.WriteString(msg); err != nil {
+		fmt.Println(a.format("[ IMPORTANTE NÃO FATAL ] Logger falhou em iniciar %v:%v\n", ErrEscritaArquivo, err))
 	}
-	return nil
 }
 
 // EscreverErro Escreve uma mensagem de erro no arquivo de log.
 // Usa a função errs.Formatar da bib interna para formatar a mensagem de erro
 //
 // Caso não consiga escrever, printa o erro
-func (a *ArquivoLog) EscreverErro(action string, erro error) error {
-	erroFormatado := a.Format(erro)
-
-	if _, err := a.File.WriteString(erroFormatado); err != nil {
-		fmt.Printf("Erro ao escrever no log: %v\n", err)
-		return err
-	}
-	return erro
+func (a *ArquivoLog) EscreverErro(erro error) {
+	erroFormatado := a.formatErro(erro)
+	_, _ = a.Arquivo.WriteString(erroFormatado)
 }
 
-// NaoAchaElemento escreve uma mensagem no log e mata o programa.
-// API do Google Sheets
-// Usado especialmente quando o programa falhar em encontrar um elemento HTML
-func (a *ArquivoLog) NaoAchaElemento(HTMLElement string, err error) error {
-	return a.EscreverErro(fmt.Sprintf("tentar encontrar o elemento %s", HTMLElement), err)
+// EscreverMensagemComReqID uma mensagem no arquivo de log.
+//
+// Caso não consiga escrever, printa o erro
+func (a *ArquivoLog) EscreverMensagemComReqID(reqID, msg string, args ...any) {
+	msg = a.format(msg, args...)
+	msg = fmt.Sprintf("[%s] %s", reqID, msg)
+	if _, err := a.Arquivo.WriteString(msg); err != nil {
+		fmt.Println(a.format("[ IMPORTANTE NÃO FATAL ] Logger falhou em iniciar %v:%v\n", ErrEscritaArquivo, err))
+	}
+}
+
+// EscreverErroComReqID Escreve uma mensagem de erro no arquivo de log.
+// Usa a função errs.Formatar da bib interna para formatar a mensagem de erro
+//
+// Caso não consiga escrever, printa o erro
+func (a *ArquivoLog) EscreverErroComReqID(reqID string, erro error) {
+	erroFormatado := a.formatErro(erro)
+	erroFormatado = fmt.Sprintf("[%s] %s", reqID, erroFormatado)
+	if _, err := a.Arquivo.WriteString(erroFormatado); err != nil {
+		fmt.Println(a.format("[ IMPORTANTE NÃO FATAL ] Logger falhou em iniciar %v:%v\n", ErrEscritaArquivo, err))
+	}
 }
 
 func (a *ArquivoLog) Fechar() {
-	_ = a.File.Close()
+	_ = a.Arquivo.Close()
 }
 
-func (a *ArquivoLog) EncerrarAplicacao() {
-	_ = a.Escrever("Aplicação encerrada.")
-	fmt.Println("Aplicação encerrada, cheque os logs em ", a.Caminho)
+func (a *ArquivoLog) EncerrarAplicacao() string {
+	a.EscreverMensagem("Aplicação encerrada.")
+	return "Aplicação encerrada, cheque os logs para mais detalhes."
 }

@@ -14,9 +14,10 @@ type Config struct {
 	Website string `env:"SITE,required"`
 }
 
-func Load() (Config, error) {
+// Load carrega o dotenv. Caso ele não esteja na pasta raíz, procura uma antes
+func Load(Caminho string) (Config, error) {
 	var cfg Config
-	caminhoDotEnv := filepath.Join(sistema.PathRaiz, "../.env")
+	caminhoDotEnv := filepath.Join(sistema.PathRaiz, "./.env")
 	err := godotenv.Load(caminhoDotEnv)
 	if err != nil {
 		if strings.Contains(err.Error(), "no such file or directory") {

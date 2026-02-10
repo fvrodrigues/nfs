@@ -17,32 +17,48 @@ func New(pagina *rod.Pagina) *Receita {
 	}
 }
 
-func (r *Receita) AcessarSiteReceita(url string) error {
-	err := r.AcessarSite(url)
+func (r *Receita) AcessarSiteReceita() error {
+	err := r.AcessarSite("https://nfe.prefeitura.sp.gov.br/login.aspx")
 	if err == nil {
-		return nil
+		return r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond)
 	}
 
 	if strings.Contains(err.Error(), "ERR_ABORTED") {
-		return fmt.Errorf("%w: sessão abortada ao tentar acessar %s. Tente novamente", ErrSessaoAbortada, url)
+		return fmt.Errorf("%w: sessão abortada ao tentar acessar website da receita. Tente novamente", ErrSessaoAbortada)
 	}
-	return fmt.Errorf("erro genérico ao acessar %s: %w", url, err)
+	return fmt.Errorf("erro genérico ao acessar website da receita: %w", err)
 }
 
-func (r *Receita) ApertarLoginUnico() error {
-	err := r.ApertarElemento(".oauth-button")
+func (r *Receita) EncontrarBotaoLoginUnico() error {
+	err := r.EsperarEstabilidade(40*time.Second, 400*time.Millisecond)
 	if err != nil {
-		if strings.Contains(err.Error(), "deadline exceeded") {
-			return fmt.Errorf("%w: %s", ErrNaoEncontrouElemento, "não foi possível encontrar .oauth-button (login único) na página de login, verifique se o mesmo ainda existe.")
-		}
-		return fmt.Errorf("%w:%s", err, "erro inesperado achar campo de login único")
+		return ErrNaoCarregaNovaPagina
 	}
-
-	r.MustWaitStable()
+	_, err = r.RetornaElemento(".oauth-button", 500*time.Millisecond)
+	if err != nil {
+		return r.wrapErrorApertarElemento(err, ".oauth-button", "encontrar botão de login único")
+	}
 	return nil
 }
 
-func (r *Receita) FazerLogin(cpfCnpj, senha string) error {
+func (r *Receita) ApertarLoginUnico() error {
+	err := r.EsperarEstabilidade(40*time.Second, 400*time.Millisecond)
+	if err != nil {
+		return ErrNaoCarregaNovaPagina
+	}
+	err = r.ApertarElemento(".oauth-button")
+	if err != nil {
+		return fmt.Errorf("%s:%w", "erro inesperado achar campo de login único", err)
+	}
+
+	return r.EsperarEstabilidade(40*time.Second, 400*time.Millisecond)
+}
+
+func (r *Receita) ColocarDadosLogin(cpfCnpj, senha string) error {
+	err := r.EsperarEstabilidade(40*time.Second, 400*time.Millisecond)
+	if err != nil {
+		return ErrNaoCarregaNovaPagina
+	}
 	r.PausaHumana(2)
 
 	if err := r.EscreverComoHumano("#cpfCnpj", cpfCnpj); err != nil {
@@ -51,17 +67,27 @@ func (r *Receita) FazerLogin(cpfCnpj, senha string) error {
 	if err := r.EscreverComoHumano("#password", senha); err != nil {
 		return r.wrapErrorApertarElemento(err, "#password", "escrever no campo de senha")
 	}
+	return nil
+}
+
+func (r *Receita) ApertarLogin() error {
+	r.PausaHumana(2)
+
+	err := r.EsperarEstabilidade(40*time.Second, 400*time.Millisecond)
+	if err != nil {
+		return ErrNaoCarregaNovaPagina
+	}
+	r.PausaHumana(2)
 
 	if err := r.ApertarElemento(".btn-entrar"); err != nil {
 		return r.wrapErrorApertarElemento(err, ".btn-entrar", "fazer login")
 	}
 
 	if existe, _, _ := r.Timeout(400 * time.Millisecond).Has(".text-danger"); existe {
-		return fmt.Errorf("%w: %s", ErrDadosLoginInvalidos, "dados de login inválidos")
+		return ErrDadosLoginInvalidos
 	}
-
-	if err := r.EsperarEstabilidade(40*time.Second, 400*time.Millisecond); err != nil {
-		return fmt.Errorf("%w: impossível fazer login", ErrConexao)
+	if err := r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond); err != nil {
+		return r.wrapErroLoad(err)
 	}
 	return nil
 }

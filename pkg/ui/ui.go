@@ -4,37 +4,25 @@ import "fmt"
 
 // UI somente será usad no workflow
 type UI struct {
-	Erro           func(error)
-	Sucesso        func(string)
-	SucessoComArg  func(string, any)
-	Msg            func(string)
-	MsgComArg      func(string, any)
-	Workflow       func(string)
-	WorkflowComArg func(string, any)
+	Erro    func(any, ...any)
+	Sucesso func(string, ...any)
+	Msg     func(string, ...any)
 }
 
 func NewUI() *UI {
 	return &UI{
-		Erro: func(err error) {
-			fmt.Printf("[ FALHA ] %v\n", err)
+		Erro: func(msgErro any, args ...any) {
+			msg := fmt.Sprintf("%v", msgErro)
+			mensagem := fmt.Sprintf(msg, args...)
+			fmt.Printf("[ ERRO ] %s\n", mensagem)
 		},
-		Sucesso: func(mensagem string) {
-			fmt.Printf("[ SUCESSO ] " + mensagem + "\n")
+		Sucesso: func(mensagem string, args ...any) {
+			mensagem = fmt.Sprintf(mensagem, args...)
+			fmt.Printf("[ SUCESSO ] %s\n", mensagem)
 		},
-		SucessoComArg: func(mensagem string, arg any) {
-			fmt.Printf("[ SUCESSO ] "+mensagem+"\n", arg)
-		},
-		Msg: func(mensagem string) {
-			fmt.Printf("[ . ] " + mensagem + "\n")
-		},
-		MsgComArg: func(mensagem string, arg any) {
-			fmt.Printf("[ . ] "+mensagem+"\n", arg)
-		},
-		Workflow: func(mensagem string) {
-			fmt.Printf("[ WORKFLOW ] " + mensagem + "\n")
-		},
-		WorkflowComArg: func(mensagem string, arg any) {
-			fmt.Printf("[ WORKFLOW ] "+mensagem+"\n", arg)
+		Msg: func(mensagem string, args ...any) {
+			mensagem = fmt.Sprintf(mensagem, args...)
+			fmt.Printf("[ . ] %s\n", mensagem)
 		},
 	}
 }

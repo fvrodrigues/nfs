@@ -3,7 +3,6 @@ package rod
 import (
 	"fmt"
 	"math/rand"
-	"nfse/pkg/logger"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -14,7 +13,6 @@ import (
 )
 
 type Pagina struct {
-	Log       *logger.ArquivoLog
 	Navegador *rod.Browser
 	// Mesmo com embedded field, o nome desse campo é "Page"
 	*rod.Page
@@ -22,7 +20,7 @@ type Pagina struct {
 
 // CriarNavegador cria uma instância do navegador configurado para a automação e inicia o logger.
 // Se true, navegador virá headless
-func CriarNavegador(log *logger.ArquivoLog, headless bool) (*Pagina, error) {
+func CriarNavegador(headless bool) (*Pagina, error) {
 	l := launcher.New().Headless(headless).Devtools(false)
 	l.Set("disable-gpu")
 	l.Set("no-sandbox")
@@ -40,7 +38,6 @@ func CriarNavegador(log *logger.ArquivoLog, headless bool) (*Pagina, error) {
 	page := stealth.MustPage(browser)
 
 	return &Pagina{
-		Log:       log,
 		Navegador: browser,
 		Page:      page,
 	}, nil
@@ -102,12 +99,23 @@ func (p *Pagina) EscreverComoHumano(HTMLElement string, conteudo string) error {
 	return nil
 }
 
-func (p *Pagina) DigitarTecladoComoHumano(HTMLElement string, conteudo string) error {
+func (p *Pagina) DigitarTecladoComoHumano(HTMLElement string, conteudo string, deveApagar bool) error {
 	el, err := p.RetornaElemento(HTMLElement, 5)
 	if err != nil {
 		return fmt.Errorf("erro ao encontrar elemento %s: %w\n", HTMLElement, err)
 	}
 	p.ApertarElementoDefinido(el)
+
+	if deveApagar {
+		p.Keyboard.Press(input.ControlLeft)
+		p.Keyboard.Press(input.KeyA)
+
+		p.Keyboard.Release(input.ControlLeft)
+		p.Keyboard.Release(input.KeyA)
+
+		p.Keyboard.Press(input.Delete)
+		p.Keyboard.Release(input.Delete)
+	}
 
 	for _, char := range conteudo {
 		p.PausaHumana(1)

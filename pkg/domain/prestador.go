@@ -1,6 +1,9 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"nfse/pkg/receita"
+)
 
 type Prestador struct {
 	Prestador string `json:"prestador" validate:"required,min=3,max=100"`
@@ -44,8 +47,8 @@ func (p *Prestador) ValidaDadosCorpoReq() error {
 			return fmt.Errorf("%w: %s", ErrFaltaValorObrigatorio, "valor do serviços")
 		case nota.Observacao == "":
 			return fmt.Errorf("%w: %s", ErrFaltaValorObrigatorio, "discriminação de serviço")
-		case nota.Data == "":
-			return fmt.Errorf("%w: %s", ErrFaltaValorObrigatorio, "data prestação de serviço")
+		case nota.Data == "" || !receita.DataEhValida(nota.Data):
+			return fmt.Errorf("%w: %s", ErrFaltaValorObrigatorio, "data prestação de serviço faltando ou inválida")
 		}
 	}
 

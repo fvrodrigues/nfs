@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"nfse/pkg/domain"
 	"strings"
-	"time"
 )
 
 // Prestador é a struct com todos os valores de 'login' e notas para emitir sanitizados e prontos para usar.
@@ -141,10 +140,10 @@ func (p *Planilha) TrataValoresDasAbas(linhas [][]any, aba string) ([]domain.Not
 			data       = ParaStr(linha[indexData])
 		)
 
-		data, ok := ParseData(data)
-		if !ok {
-			data = time.Now().Format("02/01/2006")
-		}
+		//data, ok := ParseData(data)
+		//if !ok {
+		//	data = time.Now().Format("02/01/2006")
+		//}
 		// Como alguns campos podem ficar vazios, se a lógica abaixo não existir essa função vai retornar um monte de notas com valores vazios e true/falses aleatórios.
 		if valor == "" || cnpj == "" {
 			continue
@@ -235,12 +234,4 @@ func HeaderValido(header []any, aba string) error {
 		return fmt.Errorf("%w: %s", ErrFaltaColunaObrigatoria, faltantes) //errors.New(fmt.Sprintf("aba %s faltando colunas: %v", aba, colunasFaltantes))
 	}
 	return nil
-}
-
-func ParseData(dataStr string) (string, bool) {
-	data, err := time.Parse("02/01/2006", dataStr)
-	if err != nil {
-		return "", false
-	}
-	return data.Format("02/01/2006"), true
 }

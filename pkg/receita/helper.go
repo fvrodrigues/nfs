@@ -38,6 +38,16 @@ func (r *Receita) wrapErroEncontrarElemento(err error, el, acao string) error {
 	return fmt.Errorf("erro inesperado ao %s: %w", acao, err)
 }
 
+func (r *Receita) wrapErroLoad(err error) error {
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "deadline exceeded") {
+		return ErrConexao
+	}
+	return fmt.Errorf("erro inesperado ao obter resposta do servidor: %w", err)
+}
+
 func (r *Receita) DataParaDigitarComoHumano(data string) string {
 	slData := strings.Split(data, "/")
 	return fmt.Sprintf("%s%s%s", slData[0], slData[1], slData[2])
@@ -57,4 +67,12 @@ func (r *Receita) EsperarEstabilidade(sec, ms time.Duration) error {
 		return err
 	}
 	return r.Timeout(sec).WaitStable(ms)
+}
+
+func DataEhValida(dataStr string) bool {
+	_, err := time.Parse("02/01/2006", dataStr)
+	if err != nil {
+		return false
+	}
+	return true
 }

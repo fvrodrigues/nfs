@@ -21,13 +21,16 @@ func main() {
 func run() error {
 	log, err := logger.New()
 	if err != nil {
-		return fmt.Errorf("%s: %w", "criar pasta /logs ou arquivo de log", err)
+		return fmt.Errorf("%w", err)
 	}
+	horaAplicativoIniciado := time.Now().Format("02-01-2006 15:04:05.000")
+	log.LogInicio(horaAplicativoIniciado)
 	defer log.Fechar()
 
 	planilha := sheets.NovaPlanilha(log, "1eLIdvPoR_X-SW5nKd7fu7mN4i6qp5au55iNYAA8jt9Q")
 	if err := planilha.NewService(); err != nil {
-		return log.EscreverErro("criar conexão com a API do Google Sheets", err)
+		log.EscreverErro(err)
+		return err
 	}
 
 	uInterface := ui.NewUI()
@@ -36,7 +39,7 @@ func run() error {
 	handler := handlers.NewPrestadorHandler(w)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/prestador", handler.Handle)
+	mux.HandleFunc("/prestador", handler.HandlePost)
 	fmt.Println("Servidor rodando na porta 8080")
 
 	server := &http.Server{Addr: ":8080", Handler: mux}

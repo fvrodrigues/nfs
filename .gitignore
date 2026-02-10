@@ -15,7 +15,7 @@ bin/*
 #Ignora qualquer pasta com nome logs e a pasta de testes de API que uso com pequenos projetos para testes
 logs/
 NFs/
-/.TESTES_nao-coloque-no-github
+.testes/
 
 #Ignora código antigo
 bot*

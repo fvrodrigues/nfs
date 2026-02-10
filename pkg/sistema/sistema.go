@@ -70,8 +70,26 @@ func IniciarAppComBash() error {
 	return nil
 }
 
-// CriarPasta cria uma pasta na raíz do projeto com um nome definido pelo argumento
-func CriarPasta(nome string) (string, error) {
+// CriarPastaComPathAbsoluto cria uma pasta no sistema com permissões 0700. Não consegue burlar nenhuma permissão de usuário
+// Input:
+//
+// fmt.Println(CriarPastaComPathAbsoluto("/home", "user", "arquivo"))
+//
+// Output:
+//
+// /home/user/arquivo <nil>
+func CriarPastaComPathAbsoluto(elemen ...string) (string, error) {
+	caminho := filepath.Join(elemen...)
+	err := os.MkdirAll(caminho, 0700)
+	if err != nil {
+		return "", fmt.Errorf("%w:%w", ErrMkdir, err)
+	}
+
+	return caminho, nil
+}
+
+// CriarPastaNaRaiz cria uma pasta na raíz do projeto com um nome definido pelo argumento
+func CriarPastaNaRaiz(nome string) (string, error) {
 	pathPastaNova := filepath.Join(PathRaiz, nome)
 
 	err := os.MkdirAll(pathPastaNova, 0700)
@@ -83,7 +101,7 @@ func CriarPasta(nome string) (string, error) {
 }
 
 func CriarPastaParaPrestador(prestador string) (string, error) {
-	pathNFs, err := CriarPasta("NFs")
+	pathNFs, err := CriarPastaNaRaiz("NFs")
 	if err != nil {
 		return "", err
 	}
@@ -96,4 +114,8 @@ func CriarPastaParaPrestador(prestador string) (string, error) {
 	}
 
 	return pathPrestador, nil
+}
+
+func LimparPastaNF(path string) error {
+	return os.RemoveAll(path)
 }

@@ -1,32 +1,35 @@
 package receita
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/go-rod/rod/lib/proto"
 )
 
 func (r *Receita) IrParaFormsEmissao() error {
+	if err := r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond); err != nil {
+		return r.wrapErroLoad(err)
+	}
+	r.PausaHumana(2)
 	err := r.AcessarSite("https://nfe.prefeitura.sp.gov.br/contribuinte/nota.aspx")
 	if err != nil {
 		return err
 	}
 
 	if err := r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond); err != nil {
-		return fmt.Errorf("%w: não foi possível carregar forms de emissão", ErrNaoCarregaNovaPagina)
+		return r.wrapErroLoad(err)
 	}
 
 	return nil
 }
 
-func (r *Receita) ColocaCnpjEData(cnpj, data string) error {
-	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbCPFCNPJTomador", cnpj); err != nil {
+func (r *Receita) ColocaCnpjEData(cnpj, data string, apagar bool) error {
+	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbCPFCNPJTomador", cnpj, apagar); err != nil {
 		return r.wrapErrorApertarElemento(err, "#ctl00_body_tbCPFCNPJTomador", "digitar cnpj")
 	}
 
 	data = r.DataParaDigitarComoHumano(data)
-	if err := r.DigitarTecladoComoHumano("#ctl00_body_txtEmitidoEm", data); err != nil {
+	if err := r.DigitarTecladoComoHumano("#ctl00_body_txtEmitidoEm", data, apagar); err != nil {
 		return r.wrapErrorApertarElemento(err, "#ctl00_body_txtEmitidoEm", "digitar data")
 	}
 
@@ -46,34 +49,42 @@ func (r *Receita) ColocaCnpjEData(cnpj, data string) error {
 	}
 
 	if err := r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond); err != nil {
-		return fmt.Errorf("%w:%s", ErrNaoCarregaNovaPagina, "não foi possível carregar página com forms para emissão")
+		return r.wrapErroLoad(err)
 	}
 	return nil
 }
 
-func (r *Receita) ColocarDadosEEmitirNF(nome, obs, valor string) error {
-	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbRazaoSocial", nome); err != nil {
+func (r *Receita) ColocarDadosEEmitirNF(nome, obs, valor string, apagar bool) error {
+	if err := r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond); err != nil {
+		return r.wrapErroLoad(err)
+	}
+
+	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbRazaoSocial", nome, apagar); err != nil {
 		return r.wrapErrorApertarElemento(err, "#ctl00_body_tbRazaoSocial", "digitar nome do tomador")
 	}
 
-	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbDiscriminacao", obs); err != nil {
+	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbDiscriminacao", obs, apagar); err != nil {
 		return r.wrapErrorApertarElemento(err, "ctl00_body_tbDiscriminacao", "colocar discriminação do serviço")
 	}
 
-	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbValor", valor); err != nil {
+	if err := r.DigitarTecladoComoHumano("#ctl00_body_tbValor", valor, apagar); err != nil {
 		return r.wrapErrorApertarElemento(err, "#ctl00_body_tbValor", "digitar valor da NF")
 	}
 
 	if err := r.ApertarDialogEmitir(); err != nil {
 		return r.wrapErrorApertarElemento(err, "#ctl00_body_btEmitir", "emitir nota")
 	}
+	if err := r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond); err != nil {
+		return r.wrapErroLoad(err)
+	}
 
-	wait := r.Page.WaitNavigation(proto.PageLifecycleEventNameLoad)
+	if _, err := r.Timeout(500 * time.Millisecond).Search("Número do RPS não preenchido"); err == nil {
+		return ErrNumeroDeRPSPedidoDuranteEmissao
+	}
+
 	if err := r.ApertarElemento("#btDownload"); err != nil {
 		return r.wrapErrorApertarElemento(err, "#btDownload", "download de NF")
 	}
-	wait()
-
 	return nil
 }
 

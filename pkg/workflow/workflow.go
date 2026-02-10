@@ -3,7 +3,6 @@ package workflow
 import (
 	"errors"
 	"fmt"
-	"nfse/pkg/config"
 	"nfse/pkg/domain"
 	"nfse/pkg/logger"
 	"nfse/pkg/receita"
@@ -15,111 +14,140 @@ import (
 
 type Workflow struct {
 	logger   *logger.ArquivoLog
-	cfg      config.Config
 	planilha *sheets.Planilha
 	pagina   *rod.Pagina
 	receita  *receita.Receita
 	ui       *ui.UI
 }
 
-func New(logger *logger.ArquivoLog, cfg config.Config, planilha *sheets.Planilha, ui *ui.UI) *Workflow {
+func New(logger *logger.ArquivoLog, planilha *sheets.Planilha, ui *ui.UI) *Workflow {
 	return &Workflow{
 		logger:   logger,
 		planilha: planilha,
-		cfg:      cfg,
 		ui:       ui,
 	}
 }
 
-func (w *Workflow) Executar(prestador domain.Prestador) error {
+func (w *Workflow) Executar(prestador domain.Prestador, reqID string) error {
 	if err := prestador.ValidaDadosCorpoReq(); err != nil {
+		w.escreverErro(true, reqID, err)
 		return err
 	}
+	w.escreverMsg(true, reqID, "Dados de requisição recebidos, começando emissão para %s", prestador.Prestador)
 
 	pathPrestador, err := sistema.CriarPastaParaPrestador(prestador.Prestador)
 	if err != nil {
+		w.escreverErro(true, reqID, "Erro ao criar pasta para prestador: %v", err)
 		return fmt.Errorf("erro ao criar pasta para prestador: %w", err)
 	}
-	fmt.Printf("Criada pasta para prestador %s: %s\n", prestador.Prestador, pathPrestador)
+	w.escreverMsg(false, "", "Pasta para prestador %s pronta: %s\n", prestador.Prestador, pathPrestador)
 
-	pagina, err := rod.CriarNavegador(w.logger, false)
+	pagina, err := rod.CriarNavegador(false)
 	if err != nil {
-		return fmt.Errorf("erro ao criar navegador: %w", err)
+		w.escreverErro(true, reqID, "v: %v", rod.ErrCriarNavegador, err)
+		return fmt.Errorf("%w: %w", rod.ErrCriarNavegador, err)
 	}
+	w.escreverMsg(true, reqID, "Instância de navegador criada")
 	defer pagina.Close()
 
 	pagReceita := receita.New(pagina)
 	err = pagReceita.DefinirPastaDownload(pathPrestador)
 	if err != nil {
-		err = w.Retry(err,
+		w.escreverErro(true, reqID, "v: %v", rod.ErrConfigurarPastaDownloadDefault, err)
+
+		err = w.retry(err, reqID,
 			"configurar pasta de Download para prestador",
 			func() error { return w.pagina.DefinirPastaDownload(pathPrestador) })
 		if err != nil {
 			return err
 		}
 	}
-	w.ui.WorkflowComArg("Começando processo de emissão para %v", prestador.Prestador)
+	w.escreverMsg(true, reqID, "Começando processo de emissão para %s\n", prestador.Prestador)
 
-	err = pagReceita.AcessarSiteReceita(w.cfg.Website)
+	err = pagReceita.AcessarSiteReceita()
 	if err != nil {
-		if !errors.Is(err, receita.ErrSessaoAbortada) {
-			return fmt.Errorf("erro ao acessar site receita: %w", err)
+		w.escreverErro(true, reqID, "erro ao acessar site da receita: %v", err)
+
+		if errors.Is(err, receita.ErrSessaoAbortada) {
+			w.escreverErro(true, reqID, "%v: motivo desconhecido: %v", receita.ErrSessaoAbortada, err)
+			return fmt.Errorf("sessão abortada ao acessar site receita: %w", err)
 		}
 
-		err = w.Retry(err,
-			"acessar website da receita",
+		err = w.retry(err, reqID,
+			"acessar site da receita",
 			func() error {
-				return pagReceita.AcessarSiteReceita(w.cfg.Website)
+				return pagReceita.AcessarSiteReceita()
 			})
 		if err != nil {
 			return err
 		}
 	}
-	w.ui.MsgComArg("Acessado: %s", w.cfg.Website)
+	w.escreverMsg(true, reqID, "Acessado site da receita.")
 
+	err = pagReceita.EncontrarBotaoLoginUnico()
+	if err != nil {
+		w.escreverErro(true, reqID, "erro ao achar botão de login único: %v", err)
+		err = w.retry(err, reqID,
+			"encontrar botão de login único",
+			func() error { return pagReceita.EncontrarBotaoLoginUnico() })
+		if err != nil {
+			return err
+		}
+	}
 	err = pagReceita.ApertarLoginUnico()
 	if err != nil {
-		if !errors.Is(err, receita.ErrNaoEncontrouElemento) {
-			return fmt.Errorf("erro genérico ao apertar botão de login único: %w", err)
-		}
+		w.escreverErro(true, reqID, "erro ao apertar botão de login único apesar de ter sido encontrado na página: %v", err)
 
-		err = w.Retry(err,
+		err = w.retry(err, reqID,
 			"encontrar botão login único",
 			pagReceita.ApertarLoginUnico)
 		if err != nil {
 			return err
 		}
 	}
-	w.ui.Msg("Botão de login único encontrado. Indo para a página de login.")
+	w.escreverMsg(false, "", "Botão de login único encontrado. Indo para a página de login.")
 
-	err = pagReceita.FazerLogin(prestador.Login, prestador.Senha)
+	err = pagReceita.ColocarDadosLogin(prestador.Login, prestador.Senha)
 	if err != nil {
-		switch {
-		case errors.Is(err, receita.ErrDadosLoginInvalidos):
-			w.ui.Erro(err)
-			return fmt.Errorf("%w: dados de login inválidos para %s", err, prestador.Prestador)
-		case errors.Is(err, receita.ErrNaoEncontrouElemento):
-			err = w.Retry(err,
+		w.escreverErro(true, reqID, "erro ao colocar dados de login: %v", err)
+		if errors.Is(err, receita.ErrNaoEncontrouElemento) {
+			err = w.retry(err, reqID,
 				"encontrar campo de login",
 				func() error {
-					return pagReceita.FazerLogin(prestador.Login, prestador.Senha)
+					return pagReceita.ColocarDadosLogin(prestador.Login, prestador.Senha)
 				})
 			if err != nil {
 				return err
 			}
-		default:
+		}
+		w.escreverErro(true, reqID, "erro genérico ao colocar dados de login: %v", err)
+		return fmt.Errorf("erro genérico ao colocar dados de login: %w", err)
+	}
+	err = pagReceita.ApertarLogin()
+	if err != nil {
+		if errors.Is(err, receita.ErrDadosLoginInvalidos) {
+			w.escreverErro(true, reqID, "%v", receita.ErrDadosLoginInvalidos)
+			return receita.ErrDadosLoginInvalidos
+		}
+
+		w.escreverErro(true, reqID, "erro ao efetuar o login: %v", err)
+		err = w.retry(err, reqID,
+			"efetuar login",
+			pagReceita.ApertarLogin)
+		if err != nil {
 			return err
 		}
 	}
-	w.ui.MsgComArg("Login feito para %v", prestador.Prestador)
+	w.escreverMsg(true, reqID, "Login feito com sucesso para %s.", prestador.Prestador)
 
 	err = pagReceita.IrParaFormsEmissao()
 	if err != nil {
 		if !errors.Is(err, receita.ErrNaoCarregaNovaPagina) {
-			return err
+			w.escreverErro(true, reqID, "%v:%v", receita.ErrNaoCarregaNovaPagina, err)
+			return fmt.Errorf("%w: %w", receita.ErrNaoCarregaNovaPagina, err)
 		}
 
-		err = w.Retry(err,
+		err = w.retry(err, reqID,
 			"encontrar botão para forms de emissão de NFSe",
 			pagReceita.IrParaFormsEmissao)
 		if err != nil {
@@ -127,87 +155,104 @@ func (w *Workflow) Executar(prestador domain.Prestador) error {
 		}
 
 	}
-	w.ui.Msg("Botão lateral para página de emissão de NFSE encontrado.")
+	w.escreverMsg(false, "", "Forms de emissão de NFSE carregado.")
 
 	for i, nota := range prestador.NotasEmitir {
-		w.ui.Msg(fmt.Sprintf("Emitindo nota %d de %d", i+1, len(prestador.NotasEmitir)))
-		if err := pagReceita.ColocaCnpjEData(nota.Cnpj, nota.Data); err != nil {
+		w.escreverMsg(true, reqID, "Emitindo nota %d de %d", i+1, len(prestador.NotasEmitir))
+
+		if err := pagReceita.ColocaCnpjEData(nota.Cnpj, nota.Data, false); err != nil {
 			if !errors.Is(err, receita.ErrNaoEncontrouElemento) {
+				w.escreverErro(true, reqID, "erro genérico ao colocar data/cnpj: %v", err)
 				return fmt.Errorf("erro genérico ao colocar data/cnpj: %w", err)
 			}
 
-			err = w.Retry(err,
+			err = w.retry(err, reqID,
 				fmt.Sprintf("colocar data/cnpj na nota %d", i+1),
 				func() error {
-					return pagReceita.ColocaCnpjEData(nota.Cnpj, nota.Data)
+					return pagReceita.ColocaCnpjEData(nota.Cnpj, nota.Data, true)
 				})
 			if err != nil {
 				return err
 			}
 		}
 
-		if err := pagReceita.ColocarDadosEEmitirNF(nota.Tomador, nota.Observacao, nota.Valor); err != nil {
-			if !errors.Is(err, receita.ErrNaoEncontrouElemento) || !errors.Is(err, receita.ErrNaoCarregaNovaPagina) {
+		if err := pagReceita.ColocarDadosEEmitirNF(nota.Tomador, nota.Observacao, nota.Valor, false); err != nil {
+			if !(errors.Is(err, receita.ErrNaoEncontrouElemento) || errors.Is(err, receita.ErrNaoCarregaNovaPagina) || errors.Is(err, receita.ErrNumeroDeRPSPedidoDuranteEmissao)) {
+				w.escreverErro(true, reqID, "erro genérico ao colocar dados da nota %d: %v", i+1, err)
 				return fmt.Errorf("erro genérico ao colocar data/cnpj: %w", err)
 			}
 
-			err = w.Retry(err,
+			if errors.Is(err, receita.ErrNumeroDeRPSPedidoDuranteEmissao) {
+				w.escreverErro(true, reqID, "%v", receita.ErrNumeroDeRPSPedidoDuranteEmissao)
+				return receita.ErrNumeroDeRPSPedidoDuranteEmissao
+			}
+			err = w.retry(err, reqID,
 				fmt.Sprintf("colocar dados da nota %d", i+1),
 				func() error {
-					return pagReceita.ColocarDadosEEmitirNF(nota.Tomador, nota.Observacao, nota.Valor)
+					return pagReceita.ColocarDadosEEmitirNF(nota.Tomador, nota.Observacao, nota.Valor, true)
 				})
+			if err != nil {
+				return err
+			}
 		}
 
 		if err := pagReceita.VoltarParaFormDeNota(); err != nil {
-			if !errors.Is(err, receita.ErrNaoCarregaNovaPagina) || !errors.Is(err, receita.ErrNaoEncontrouElemento) {
+			if !(errors.Is(err, receita.ErrNaoCarregaNovaPagina) || errors.Is(err, receita.ErrNaoEncontrouElemento)) {
+				w.escreverErro(true, reqID, "erro genérico ao voltar para form de nota: %v", err)
 				return fmt.Errorf("erro genérico ao voltar para form de nota: %w", err)
 			}
 
-			err = w.Retry(err,
-				"voltar para form de nota %d",
+			err = w.retry(err, reqID,
+				"voltar para form de nota",
 				pagReceita.VoltarParaFormDeNota)
 			if err != nil {
 				return err
 			}
 		}
 	}
+	w.escreverMsg(true, reqID, "Todas as notas fiscais para %s foram emitidas com sucesso!", prestador.Prestador)
 
-	w.ui.SucessoComArg("Todas as notas fiscais para %s foram emitidas com sucesso!", prestador.Prestador)
-
-	//w.ui.Msg("Deslogando do site...")
-	//err = pagReceita.Deslogar()
-	//if err != nil {
-	//	if !errors.Is(err, receita.ErrNaoEncontrouElemento) && !errors.Is(err, receita.ErrNaoCarregaNovaPagina) {
-	//		return fmt.Errorf("erro genérico ao deslogar: %w", err)
-	//	}
-	//
-	//	err = w.Retry(err,
-	//		"deslogar do site",
-	//		pagReceita.Deslogar)
-	//	if err != nil {
-	//		w.ui.Msg("Voltando ao início sem deslogar, o que pode fazer o site desconfiar da automação")
-	//		continue
-	//	}
-	//}
-
-	w.ui.Sucesso("Todas as notas fiscais foram emitidas com sucesso!")
 	return nil
 }
 
-func (w *Workflow) Retry(erro error, operacao string, fn func() error) error {
+func (w *Workflow) retry(erro error, reqID, operacao string, fn func() error) error {
 	w.ui.Erro(erro)
 	w.ui.Msg("Tentando novamente...")
 
 	for i := 1; i <= 3; i++ {
 		if err := fn(); err != nil {
-			w.ui.MsgComArg("Erro na Tentativa %d", i)
+			w.ui.Erro("Erro na Tentativa %d", i)
 			if i == 3 {
-				return fmt.Errorf("falha definitiva em %s: %v", operacao, err)
+				w.escreverErro(true, reqID, "falha definitiva em %s: %v após 3 tentativas", operacao, err)
+				return fmt.Errorf("falha definitiva em %s: %w após 3 tentativas", operacao, err)
 			}
 			continue
 		}
+		w.escreverMsg(true, reqID, "Sucesso em %s na tentativa %d", operacao, i)
 		w.ui.Sucesso(operacao)
 		return nil
 	}
 	return nil
+}
+
+// escreverMsg escreve mensagem e logga o conteúdo com argumentos usando Sprintf. O log somente é feito caso necessarioLog seja true.
+//
+// ReqID somente é necessário se necessário log
+func (w *Workflow) escreverMsg(necessarioLog bool, reqID, msg string, args ...any) {
+	w.ui.Msg(msg, args...)
+	if necessarioLog {
+		w.logger.EscreverMensagemComReqID(reqID, msg, args...)
+	}
+}
+
+// escreverMsg escreve mensagem e logga o conteúdo com argumentos usando Sprintf. O log somente é feito caso necessarioLog seja true.
+//
+// ReqID somente é necessário se necessário log
+func (w *Workflow) escreverErro(necessarioLog bool, reqID string, msg any, args ...any) {
+	w.ui.Erro(msg, args...)
+	if necessarioLog {
+		msgString := fmt.Sprintf(msg.(string), args...)
+		err := errors.New(msgString)
+		w.logger.EscreverErroComReqID(reqID, err)
+	}
 }
