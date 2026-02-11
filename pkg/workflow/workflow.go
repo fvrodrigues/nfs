@@ -3,28 +3,28 @@ package workflow
 import (
 	"errors"
 	"fmt"
+	"nfse/pkg/captcha"
 	"nfse/pkg/domain"
 	"nfse/pkg/logger"
 	"nfse/pkg/receita"
 	"nfse/pkg/rod"
-	"nfse/pkg/sheets"
 	"nfse/pkg/sistema"
 	"nfse/pkg/ui"
 )
 
 type Workflow struct {
-	logger   *logger.ArquivoLog
-	planilha *sheets.Planilha
-	pagina   *rod.Pagina
-	receita  *receita.Receita
-	ui       *ui.UI
+	logger  *logger.ArquivoLog
+	captcha *captcha.Captcha
+	pagina  *rod.Pagina
+	receita *receita.Receita
+	ui      *ui.UI
 }
 
-func New(logger *logger.ArquivoLog, planilha *sheets.Planilha, ui *ui.UI) *Workflow {
+func New(logger *logger.ArquivoLog, captcha *captcha.Captcha, ui *ui.UI) *Workflow {
 	return &Workflow{
-		logger:   logger,
-		planilha: planilha,
-		ui:       ui,
+		logger:  logger,
+		captcha: captcha,
+		ui:      ui,
 	}
 }
 
@@ -48,9 +48,8 @@ func (w *Workflow) Executar(prestador domain.Prestador, reqID string) error {
 		return fmt.Errorf("%w: %w", rod.ErrCriarNavegador, err)
 	}
 	w.escreverMsg(true, reqID, "Instância de navegador criada")
-	defer pagina.Close()
 
-	pagReceita := receita.New(pagina)
+	pagReceita := receita.New(pagina, w.captcha)
 	err = pagReceita.DefinirPastaDownload(pathPrestador)
 	if err != nil {
 		w.escreverErro(true, reqID, "v: %v", rod.ErrConfigurarPastaDownloadDefault, err)
@@ -105,7 +104,7 @@ func (w *Workflow) Executar(prestador domain.Prestador, reqID string) error {
 			return err
 		}
 	}
-	w.escreverMsg(false, "", "Botão de login único encontrado. Indo para a página de login.")
+	w.escreverMsg(false, "", "Botão de login único encontrado.")
 
 	err = pagReceita.ColocarDadosLogin(prestador.Login, prestador.Senha)
 	if err != nil {
@@ -125,17 +124,35 @@ func (w *Workflow) Executar(prestador domain.Prestador, reqID string) error {
 	}
 	err = pagReceita.ApertarLogin()
 	if err != nil {
-		if errors.Is(err, receita.ErrDadosLoginInvalidos) {
+		switch {
+		case errors.Is(err, receita.ErrCaptcha):
+			w.escreverMsg(true, reqID, "%v", receita.ErrCaptcha)
+			err = pagReceita.BypassCaptcha(false)
+			if err != nil {
+				if errors.Is(err, receita.ErrNaoEncontrouElemento) {
+					w.escreverErro(true, reqID, "%v", err)
+					err = w.retry(err, reqID,
+						"fazer captcha",
+						func() error {
+							return pagReceita.BypassCaptcha(true)
+						})
+				}
+				if errors.Is(err, captcha.ErrAPI2Captcha) {
+					w.escreverErro(true, reqID, "%v", err)
+					return fmt.Errorf("")
+				}
+			}
+		case errors.Is(err, receita.ErrDadosLoginInvalidos):
 			w.escreverErro(true, reqID, "%v", receita.ErrDadosLoginInvalidos)
 			return receita.ErrDadosLoginInvalidos
-		}
-
-		w.escreverErro(true, reqID, "erro ao efetuar o login: %v", err)
-		err = w.retry(err, reqID,
-			"efetuar login",
-			pagReceita.ApertarLogin)
-		if err != nil {
-			return err
+		default:
+			w.escreverErro(true, reqID, "erro ao efetuar o login: %v", err)
+			err = w.retry(err, reqID,
+				"efetuar login",
+				pagReceita.ApertarLogin)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	w.escreverMsg(true, reqID, "Login feito com sucesso para %s.", prestador.Prestador)
@@ -181,7 +198,6 @@ func (w *Workflow) Executar(prestador domain.Prestador, reqID string) error {
 				w.escreverErro(true, reqID, "erro genérico ao colocar dados da nota %d: %v", i+1, err)
 				return fmt.Errorf("erro genérico ao colocar data/cnpj: %w", err)
 			}
-
 			if errors.Is(err, receita.ErrNumeroDeRPSPedidoDuranteEmissao) {
 				w.escreverErro(true, reqID, "%v", receita.ErrNumeroDeRPSPedidoDuranteEmissao)
 				return receita.ErrNumeroDeRPSPedidoDuranteEmissao
@@ -211,7 +227,7 @@ func (w *Workflow) Executar(prestador domain.Prestador, reqID string) error {
 		}
 	}
 	w.escreverMsg(true, reqID, "Todas as notas fiscais para %s foram emitidas com sucesso!", prestador.Prestador)
-
+	_ = pagina.Close()
 	return nil
 }
 

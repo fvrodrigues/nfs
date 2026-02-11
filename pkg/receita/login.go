@@ -2,18 +2,21 @@ package receita
 
 import (
 	"fmt"
+	"nfse/pkg/captcha"
 	"nfse/pkg/rod"
 	"strings"
 	"time"
 )
 
 type Receita struct {
+	Captcha *captcha.Captcha
 	*rod.Pagina
 }
 
-func New(pagina *rod.Pagina) *Receita {
+func New(pagina *rod.Pagina, captcha *captcha.Captcha) *Receita {
 	return &Receita{
-		Pagina: pagina,
+		Captcha: captcha,
+		Pagina:  pagina,
 	}
 }
 
@@ -86,10 +89,42 @@ func (r *Receita) ApertarLogin() error {
 	if existe, _, _ := r.Timeout(400 * time.Millisecond).Has(".text-danger"); existe {
 		return ErrDadosLoginInvalidos
 	}
+
 	if err := r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond); err != nil {
 		return r.wrapErroLoad(err)
 	}
+	if r.TemCaptcha() {
+		return ErrCaptcha
+	}
 	return nil
+}
+
+func (r *Receita) BypassCaptcha(deveApagar bool) error {
+	_ = r.EsperarEstabilidade(40*time.Second, 400*time.Millisecond)
+	r.PausaHumana(2)
+
+	code, _, err := r.PegaValoresCaptcha()
+	if err != nil {
+		return err // Erro já formatado
+	}
+
+	if err := r.DigitarTecladoComoHumano("#ans", code, deveApagar); err != nil {
+		return r.wrapErroEncontrarElemento(err, "#ans", "input para digitar captcha")
+	}
+	if err := r.ApertarElemento("#jar"); err != nil {
+		return r.wrapErrorApertarElemento(err, "#jar", "botão para enviar captcha")
+	}
+
+	return nil
+}
+
+func (r *Receita) PegaValoresCaptcha() (string, string, error) {
+	base64, err := r.RetornaBase64Captcha() //ErrNaoEncontrouElemento
+	if err != nil {
+		return "", "", fmt.Errorf("erro ao pegar base64 da imagem captcha: %w", err)
+	}
+	stringB64 := fmt.Sprintf("%v", base64)
+	return r.Captcha.Resolve(stringB64)
 }
 
 func (r *Receita) Deslogar() error {

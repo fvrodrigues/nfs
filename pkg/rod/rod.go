@@ -10,6 +10,7 @@ import (
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/go-rod/stealth"
+	"github.com/ysmood/gson"
 )
 
 type Pagina struct {
@@ -162,6 +163,15 @@ func (p *Pagina) DefinirPastaDownload(path string) error {
 		return fmt.Errorf("%w: %w", ErrConfigurarPastaDownloadDefault, err)
 	}
 	return nil
+}
+
+// RetornaBase64Captcha retorna o base64 da imagem captcha
+func (p *Pagina) RetornaBase64Captcha() (gson.JSON, error) {
+	img, err := p.Timeout(500 * time.Millisecond).Element("img")
+	if err != nil {
+		return gson.JSON{}, ErrNaoEncontrouElemento
+	}
+	return img.Property("src")
 }
 
 // Fechar a conexão

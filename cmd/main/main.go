@@ -3,12 +3,12 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"nfse/cmd/math"
+	"nfse/pkg/captcha"
 	"nfse/pkg/handlers"
 	"nfse/pkg/logger"
-	"nfse/pkg/sheets"
 	"nfse/pkg/ui"
 	"nfse/pkg/workflow"
-	"sync"
 	"time"
 )
 
@@ -19,6 +19,8 @@ func main() {
 }
 
 func run() error {
+	porta := math.Port()
+
 	log, err := logger.New()
 	if err != nil {
 		return fmt.Errorf("%w", err)
@@ -27,29 +29,17 @@ func run() error {
 	log.LogInicio(horaAplicativoIniciado)
 	defer log.Fechar()
 
-	planilha := sheets.NovaPlanilha(log, "1eLIdvPoR_X-SW5nKd7fu7mN4i6qp5au55iNYAA8jt9Q")
-	if err := planilha.NewService(); err != nil {
-		log.EscreverErro(err)
-		return err
-	}
-
+	solver := captcha.New()
 	uInterface := ui.NewUI()
 
-	w := workflow.New(log, planilha, uInterface)
+	w := workflow.New(log, solver, uInterface)
 	handler := handlers.NewPrestadorHandler(w)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/prestador", handler.HandlePost)
-	fmt.Println("Servidor rodando na porta 8080")
+	fmt.Printf("Servidor rodando na porta %s\n", porta)
 
-	server := &http.Server{Addr: ":8080", Handler: mux}
+	server := &http.Server{Addr: porta, Handler: mux}
 
 	return server.ListenAndServe()
-}
-
-func EsperarParaSempre(wg *sync.WaitGroup) {
-	defer wg.Done()
-	for {
-		time.Sleep(time.Hour * 100)
-	}
 }

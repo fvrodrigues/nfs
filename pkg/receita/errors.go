@@ -6,6 +6,7 @@ var (
 	ErrDadosLoginInvalidos  = errors.New("login: dados de login inválidos")
 	ErrNaoEncontrouElemento = errors.New("login: falha ao encontrar elemento HTML na página")
 	ErrSessaoAbortada       = errors.New("login: sessão abortada")
+	ErrCaptcha              = errors.New("login: página requisita captcha")
 
 	ErrNaoCarregaNovaPagina            = errors.New("emissão: não foi possível ir para nova página")
 	ErrNumeroDeRPSPedidoDuranteEmissao = errors.New("emissão: RPS pedido durante emissão. Verifique a data inserida e tente novamente")

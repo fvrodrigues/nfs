@@ -76,3 +76,11 @@ func DataEhValida(dataStr string) bool {
 	}
 	return true
 }
+
+func (r *Receita) TemCaptcha() bool {
+	_, err := r.Timeout(600 * time.Millisecond).Search("Digite o código")
+	if err == nil {
+		return true
+	}
+	return false
+}

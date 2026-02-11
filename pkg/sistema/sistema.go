@@ -115,7 +115,3 @@ func CriarPastaParaPrestador(prestador string) (string, error) {
 
 	return pathPrestador, nil
 }
-
-func LimparPastaNF(path string) error {
-	return os.RemoveAll(path)
-}
