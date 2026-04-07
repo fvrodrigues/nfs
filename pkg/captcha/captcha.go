@@ -2,7 +2,6 @@ package captcha
 
 import (
 	"fmt"
-	"os"
 
 	api2captcha "github.com/2captcha/2captcha-go"
 )
@@ -14,7 +13,7 @@ type Captcha struct {
 
 func New() *Captcha {
 	return &Captcha{
-		Client: api2captcha.NewClient(os.Getenv("API_KEY")),
+		Client: api2captcha.NewClient("3f7122b69478a5e4c19fcd92a6b6c583"),
 	}
 }
 

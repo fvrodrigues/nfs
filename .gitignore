@@ -25,6 +25,3 @@ service_account.json
 
 #Ignora arquivo local
 .text.txt
-
-#Ignora todos os scripts shell
-*.sh
