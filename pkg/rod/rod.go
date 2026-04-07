@@ -23,7 +23,7 @@ type Pagina struct {
 // Se true, navegador virá headless
 func CriarNavegador(headless bool) (*Pagina, error) {
 
-	l := launcher.New().Bin("/usr/bin/chromium-browser").Headless(true).Devtools(false)
+	l := launcher.New().Bin("/opt/chromium/chrome-linux/chrome").Headless(true).Devtools(false)
 	l.Set("disable-gpu")
 	l.Set("no-sandbox")
 	l.Set("disable-dev-shm-usage")
