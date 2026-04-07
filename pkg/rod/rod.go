@@ -22,7 +22,8 @@ type Pagina struct {
 // CriarNavegador cria uma instância do navegador configurado para a automação e inicia o logger.
 // Se true, navegador virá headless
 func CriarNavegador(headless bool) (*Pagina, error) {
-	l := launcher.New().Headless(headless).Devtools(false)
+
+	l := launcher.New().Headless(true).Devtools(false)
 	l.Set("disable-gpu")
 	l.Set("no-sandbox")
 	l.Set("disable-dev-shm-usage")
