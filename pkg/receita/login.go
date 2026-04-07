@@ -37,7 +37,7 @@ func (r *Receita) EncontrarBotaoLoginUnico() error {
 	if err != nil {
 		return ErrNaoCarregaNovaPagina
 	}
-	_, err = r.RetornaElemento(".oauth-button", 500*time.Millisecond)
+	_, err = r.RetornaElemento(".oauth-button", 5*time.Millisecond)
 	if err != nil {
 		return r.wrapErrorApertarElemento(err, ".oauth-button", "encontrar botão de login único")
 	}
