@@ -2,6 +2,7 @@ package receita
 
 import (
 	"fmt"
+	"log"
 	"nfse/pkg/captcha"
 	"nfse/pkg/rod"
 	"strings"
@@ -66,15 +67,21 @@ func (r *Receita) ColocarDadosLogin(cpfCnpj, senha string) error {
 
 	r.PausaHumana(2)
 
-	html, _ := r.HTML()
-	fmt.Println(html)
-
 	// Espera o campo de CPF/CNPJ ser visível antes de escrever
 	elCpf, err := r.Timeout(10 * time.Second).Element("#cpfCnpj")
 	if err != nil {
 		return r.wrapErrorApertarElemento(err, "#cpfCnpj", "escrever no campo de cpf/cnpj")
 	}
 	elCpf.MustWaitVisible() // Garante que o campo está visível
+
+	// Pega apenas o HTML do campo de CPF/CNPJ
+	htmlCampo, err := elCpf.HTML()
+	if err != nil {
+		log.Fatalf("erro ao pegar HTML do campo: %v", err)
+	}
+
+	// Imprime ou salva
+	fmt.Println(htmlCampo)
 
 	if err := r.EscreverComoHumano("#cpfCnpj", cpfCnpj); err != nil {
 		return r.wrapErrorApertarElemento(err, "#cpfCnpj", "escrever no campo de cpf/cnpj")
