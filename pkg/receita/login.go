@@ -45,7 +45,7 @@ func (r *Receita) EncontrarBotaoLoginUnico() error {
 }
 
 func (r *Receita) ApertarLoginUnico() error {
-	err := r.EsperarEstabilidade(40*time.Second, 400*time.Millisecond)
+	err := r.EsperarEstabilidade(120*time.Second, 400*time.Millisecond)
 	if err != nil {
 		return ErrNaoCarregaNovaPagina
 	}
