@@ -66,6 +66,9 @@ func (r *Receita) ColocarDadosLogin(cpfCnpj, senha string) error {
 
 	r.PausaHumana(2)
 
+	html, _ := r.HTML()
+	fmt.Println(html)
+
 	// Espera o campo de CPF/CNPJ ser visível antes de escrever
 	elCpf, err := r.Timeout(10 * time.Second).Element("#cpfCnpj")
 	if err != nil {
