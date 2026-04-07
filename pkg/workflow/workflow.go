@@ -106,6 +106,8 @@ func (w *Workflow) Executar(prestador domain.Prestador, reqID string) error {
 	}
 	w.escreverMsg(false, "", "Botão de login único encontrado.")
 
+	fmt.Printf(pagina.HTML())
+
 	err = pagReceita.ColocarDadosLogin(prestador.Login, prestador.Senha)
 	if err != nil {
 		w.escreverErro(true, reqID, "erro ao colocar dados de login: %v", err)
