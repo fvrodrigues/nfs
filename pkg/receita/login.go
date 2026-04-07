@@ -58,18 +58,36 @@ func (r *Receita) ApertarLoginUnico() error {
 }
 
 func (r *Receita) ColocarDadosLogin(cpfCnpj, senha string) error {
+	// Espera a página ficar estável
 	err := r.EsperarEstabilidade(40*time.Second, 400*time.Millisecond)
 	if err != nil {
 		return ErrNaoCarregaNovaPagina
 	}
+
 	r.PausaHumana(2)
+
+	// Espera o campo de CPF/CNPJ ser visível antes de escrever
+	elCpf, err := r.Timeout(10 * time.Second).Element("#cpfCnpj")
+	if err != nil {
+		return r.wrapErrorApertarElemento(err, "#cpfCnpj", "escrever no campo de cpf/cnpj")
+	}
+	elCpf.MustWaitVisible() // Garante que o campo está visível
 
 	if err := r.EscreverComoHumano("#cpfCnpj", cpfCnpj); err != nil {
 		return r.wrapErrorApertarElemento(err, "#cpfCnpj", "escrever no campo de cpf/cnpj")
 	}
+
+	// Espera o campo de senha ser visível antes de escrever
+	elSenha, err := r.Timeout(10 * time.Second).Element("#password")
+	if err != nil {
+		return r.wrapErrorApertarElemento(err, "#password", "escrever no campo de senha")
+	}
+	elSenha.MustWaitVisible() // Garante que o campo está visível
+
 	if err := r.EscreverComoHumano("#password", senha); err != nil {
 		return r.wrapErrorApertarElemento(err, "#password", "escrever no campo de senha")
 	}
+
 	return nil
 }
 
