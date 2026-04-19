@@ -120,21 +120,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # On PRs we only build + load locally for the smoke test. On pushes
-      # to main / tags we also push the same image to Docker Hub.
-      - name: Build image
+      # Build once and load into the runner's docker as a local-only tag
+      # (nfse:ci) so the smoke test below can run it by name. We keep this
+      # separate from the publish step because nfse:ci is unqualified and
+      # must never be pushed (docker would try docker.io/library/nfse:ci).
+      - name: Build image (smoke-test tag)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
-          # Always load into the runner's docker so the smoke test can run
-          # it by name. Push when not a PR.
           load: true
-          push: ${{ github.event_name != 'pull_request' && github.repository == 'fvrodrigues/nfs' }}
-          tags: |
-            nfse:ci
-            ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          push: false
+          tags: nfse:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -155,3 +152,18 @@ jobs:
           echo "GET /prestador -> $code"
           test "$code" = "405"
           docker stop nfse-smoke
+
+      # Publish to Docker Hub only for non-PR events (push to main, v* tags,
+      # or manual dispatch) on this repo. The build is cached via type=gha
+      # from the smoke-test build above, so this re-runs near-instantly.
+      - name: Publish image to Docker Hub
+        if: github.event_name != 'pull_request' && github.repository == 'fvrodrigues/nfs'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
