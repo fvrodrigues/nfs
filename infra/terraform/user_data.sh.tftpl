@@ -1,0 +1,34 @@
+#!/bin/bash
+set -euxo pipefail
+
+# Amazon Linux 2023 bootstrap: install Docker, enable the service, and run
+# the nfse container pinned to the port the app listens on. The container
+# is configured with restart=always so it comes back after reboots and
+# after pull failures.
+
+dnf update -y
+dnf install -y docker
+systemctl enable --now docker
+
+# Make ec2-user able to run `docker` without sudo for convenience.
+usermod -aG docker ec2-user || true
+
+# Pull the image with a short retry so transient network blips during
+# boot don't wedge first-run.
+for i in 1 2 3 4 5; do
+  if docker pull ${docker_image}; then
+    break
+  fi
+  sleep 10
+done
+
+# Idempotent (re)start: remove any previous container with the same name
+# before starting so `terraform apply` re-runs cleanly on user_data changes.
+docker rm -f ${container_name} 2>/dev/null || true
+
+docker run -d \
+  --name ${container_name} \
+  --restart unless-stopped \
+  -p ${app_port}:${app_port} \
+  -e PORT=${app_port} \
+  ${docker_image}

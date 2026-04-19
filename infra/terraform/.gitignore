@@ -1,0 +1,9 @@
+.terraform/
+# .terraform.lock.hcl is intentionally NOT ignored — it pins provider versions.
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!terraform.tfvars.example
+crash.log
+crash.*.log
