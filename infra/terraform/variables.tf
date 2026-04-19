@@ -35,9 +35,9 @@ variable "app_ingress_cidrs" {
 }
 
 variable "ssh_ingress_cidrs" {
-  description = "CIDR blocks allowed to SSH into the EC2 instance. Leave empty to disable SSH entirely (recommended in production)."
+  description = "CIDR blocks allowed to SSH into the EC2 instance. Defaults to 0.0.0.0/0 for sandbox/lab convenience so you can use the Console's Connect -> EC2 Instance Connect button (AL2023 has the EIC agent pre-installed, no key pair required). Tighten to your own CIDR in production."
   type        = list(string)
-  default     = []
+  default     = ["0.0.0.0/0"]
 }
 
 variable "key_pair_name" {
