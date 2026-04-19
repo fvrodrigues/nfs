@@ -9,8 +9,8 @@ resource "aws_security_group" "nfse" {
   description = "Inbound rules for the nfse EC2 host"
   vpc_id      = data.aws_vpc.default.id
 
-  # App port (direct hit, bypasses API Gateway). Kept open to the
-  # internet so /prestador works without the 30s API Gateway cap.
+  # App port. Kept open to the internet so /prestador is directly
+  # reachable; tighten app_ingress_cidrs in production.
   ingress {
     description = "nfse HTTP app port"
     from_port   = var.app_port

@@ -3,17 +3,14 @@
 This module provisions a minimal AWS footprint for running the `rodriguesflavio/nfse` container:
 
 - **EC2** (Amazon Linux 2023) with Docker installed via `user_data`, pulling and running the image on `:8080` with `restart=unless-stopped`.
-- **Security group** allowing inbound `:8080` from the internet (configurable) so callers can hit `/prestador` directly without the 30s API Gateway timeout.
-- **HTTP API Gateway v2** (`enable_api_gateway = true` by default) with a catch-all `ANY /{proxy+}` route pointing at the EC2. Provided for convenience / future lightweight endpoints; **do not call `/prestador` through it** unless your flow completes in under 30 seconds.
+- **Security group** allowing inbound `:8080` from the internet (configurable).
 
-## Why EC2 is the primary entry point
-
-API Gateway HTTP API has a hard 30s integration timeout. The nfse `/prestador` flow takes ~25s for login alone and longer when emitting notas, so calling it through API Gateway would return 504 while the EC2 keeps processing. The EC2's public `:8080` is the intended entry point for `/prestador`; API Gateway is only useful for short requests.
+Callers hit `/prestador` directly on the EC2 host's public DNS. No load balancer or API Gateway is provisioned — the `/prestador` flow takes ~25s for login alone and longer when emitting notas, which exceeds API Gateway's 30s integration timeout.
 
 ## Prerequisites
 
 - Terraform `>= 1.5`
-- AWS credentials in the environment (`aws configure`, `aws sso login`, or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars). The identity used needs permission to create EC2 instances, security groups, and HTTP API Gateway v2 resources.
+- AWS credentials in the environment (`aws configure`, `aws sso login`, or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars). The identity used needs permission to create EC2 instances and security groups.
 
 ## Usage
 
@@ -26,7 +23,7 @@ Before the first run, add two repo secrets at https://github.com/fvrodrigues/nfs
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 
-The IAM principal behind those keys needs permissions for EC2, VPC (read default), API Gateway v2, and SSM (`GetParameter` for the AMI lookup).
+The IAM principal behind those keys needs permissions for EC2, VPC (read default), and SSM (`GetParameter` for the AMI lookup).
 
 **State persistence caveat.** The workflow uploads `terraform.tfstate` as a workflow artifact after every `apply`/`destroy` and downloads the most recent successful artifact before each run. This gives you working state across sequential dispatches but is **single-operator, not concurrent**. Don't trigger two `apply`s back-to-back, and don't mix local `terraform apply` with workflow `apply` — the artifact won't see local changes and vice versa. If more than one person needs to run this, switch to an S3 + DynamoDB backend.
 
@@ -42,9 +39,9 @@ terraform apply
 
 After apply, the outputs include:
 
-- `app_url` — `http://<ec2-public-dns>:8080`, the primary entry point
-- `api_gateway_url` — HTTP API Gateway invoke URL (null if disabled)
+- `app_url` — `http://<ec2-public-dns>:8080`
 - `instance_id` — EC2 instance ID
+- `instance_public_dns` / `instance_public_ip` — raw host details
 
 Test `/prestador` against EC2 directly:
 
@@ -67,7 +64,6 @@ See [`variables.tf`](variables.tf) for the full list. Highlights:
 | `app_ingress_cidrs` | `["0.0.0.0/0"]` | Who can hit `:8080` on EC2. Tighten to your callers' CIDR if possible. |
 | `ssh_ingress_cidrs` | `[]` | SSH ingress. Empty disables SSH entirely. |
 | `key_pair_name` | `""` | Existing EC2 key pair name, required if you want SSH. |
-| `enable_api_gateway` | `true` | Set to `false` to skip the HTTP API entirely. |
 
 ## Shell access
 

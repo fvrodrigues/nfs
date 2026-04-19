@@ -29,7 +29,7 @@ variable "app_port" {
 }
 
 variable "app_ingress_cidrs" {
-  description = "CIDR blocks allowed to reach the app port directly on the EC2 instance. Defaults to the open internet because /prestador has to be reachable by callers without going through API Gateway (API Gateway's 30s timeout is too short for the login+emission flow)."
+  description = "CIDR blocks allowed to reach the app port directly on the EC2 instance. Tighten to your callers' CIDR in production."
   type        = list(string)
   default     = ["0.0.0.0/0"]
 }
@@ -50,16 +50,4 @@ variable "associate_public_ip" {
   description = "Whether to associate a public IP with the EC2 instance. Required if you want to reach :8080 from the internet directly."
   type        = bool
   default     = true
-}
-
-variable "enable_api_gateway" {
-  description = "Whether to provision an HTTP API Gateway in front of the instance. The API Gateway is convenient for light endpoints but WILL time out after ~30s on /prestador; prefer hitting the EC2 directly for the main workflow."
-  type        = bool
-  default     = true
-}
-
-variable "api_stage_name" {
-  description = "HTTP API Gateway stage. Uses the default stage (auto-deployed) unless you override."
-  type        = string
-  default     = "$default"
 }
