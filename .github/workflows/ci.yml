@@ -107,7 +107,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ vars.DOCKERHUB_REPO || 'fvrodrigues/nfse' }}
+          images: ${{ vars.DOCKERHUB_REPO || 'rodriguesflavio/nfse' }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=long,enable={{is_default_branch}}
