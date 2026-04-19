@@ -6,12 +6,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"nfse/pkg/captcha"
-	nfserod "nfse/pkg/rod"
 	"nfse/pkg/receita"
+	nfserod "nfse/pkg/rod"
 )
 
 // mockPortal stands up a tiny HTTP server that mimics just enough of the
@@ -19,16 +20,26 @@ import (
 //
 //  1. GET /login.aspx               → page with `.oauth-button` → /login-unico
 //  2. GET /login-unico              → page with #cpfCnpj, #password, .btn-entrar
-//                                     (on click, JS redirects to /logged-in)
+//     (on click, JS redirects to /logged-in)
 //  3. GET /logged-in                → landing page (no .text-danger, no captcha)
 //
 // It records the login credentials that were submitted via the #cpfCnpj and
 // #password fields so the test can assert the automation typed them correctly.
 type mockPortal struct {
-	server         *httptest.Server
+	server *httptest.Server
+
+	// mu guards the fields below, which are written from the HTTP handler
+	// goroutine and read from the test goroutine.
+	mu             sync.Mutex
 	loggedInCpf    string
 	loggedInSenha  string
 	gotLoggedInHit bool
+}
+
+func (mp *mockPortal) snapshot() (hit bool, cpf, senha string) {
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+	return mp.gotLoggedInHit, mp.loggedInCpf, mp.loggedInSenha
 }
 
 func newMockPortal(t *testing.T) *mockPortal {
@@ -68,9 +79,13 @@ function submitLogin() {
 	})
 
 	mux.HandleFunc("/logged-in", func(w http.ResponseWriter, r *http.Request) {
+		cpf := r.URL.Query().Get("cpf")
+		senha := r.URL.Query().Get("senha")
+		mp.mu.Lock()
 		mp.gotLoggedInHit = true
-		mp.loggedInCpf = r.URL.Query().Get("cpf")
-		mp.loggedInSenha = r.URL.Query().Get("senha")
+		mp.loggedInCpf = cpf
+		mp.loggedInSenha = senha
+		mp.mu.Unlock()
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		fmt.Fprint(w, `<!doctype html><html><head><meta charset="utf-8"><title>mock dashboard</title></head>
 <body>
@@ -172,16 +187,25 @@ func TestLoginE2E(t *testing.T) {
 
 	// Give the mock portal up to a few seconds to observe the /logged-in hit.
 	deadline := time.Now().Add(15 * time.Second)
-	for time.Now().Before(deadline) && !mp.gotLoggedInHit {
+	var (
+		gotHit   bool
+		gotCpf   string
+		gotSenha string
+	)
+	for time.Now().Before(deadline) {
+		gotHit, gotCpf, gotSenha = mp.snapshot()
+		if gotHit {
+			break
+		}
 		time.Sleep(100 * time.Millisecond)
 	}
-	if !mp.gotLoggedInHit {
+	if !gotHit {
 		t.Fatalf("mock portal never saw /logged-in hit after login click")
 	}
-	if mp.loggedInCpf != cpf {
-		t.Errorf("mock portal received cpf=%q, want %q", mp.loggedInCpf, cpf)
+	if gotCpf != cpf {
+		t.Errorf("mock portal received cpf=%q, want %q", gotCpf, cpf)
 	}
-	if mp.loggedInSenha != senha {
-		t.Errorf("mock portal received senha=%q, want %q", mp.loggedInSenha, senha)
+	if gotSenha != senha {
+		t.Errorf("mock portal received senha=%q, want %q", gotSenha, senha)
 	}
 }
