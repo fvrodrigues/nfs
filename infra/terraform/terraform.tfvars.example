@@ -5,6 +5,3 @@ docker_image  = "rodriguesflavio/nfse:latest"
 # Restrict SSH to your IP if you want SSH access. Leave empty to disable SSH.
 # ssh_ingress_cidrs = ["203.0.113.42/32"]
 # key_pair_name     = "my-existing-keypair"
-
-# Set to false if you only want EC2 and don't need the API Gateway.
-# enable_api_gateway = true
