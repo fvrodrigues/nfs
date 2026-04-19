@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -87,21 +88,53 @@ jobs:
     name: Docker image build
     runs-on: ubuntu-latest
     needs: build
+    # Allow access to repo secrets for the Docker Hub login step. For PRs
+    # from forks these secrets are unavailable; the login/push steps are
+    # gated on event_name below so the job still passes for fork PRs
+    # (build + smoke-test only, no publish).
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
       - uses: docker/setup-buildx-action@v3
 
+      # Compute image tags and labels. Pushes to main → `latest` + the git
+      # SHA; pushes of a `v*` tag → the semver tag (e.g. v1.2.3, 1.2, 1).
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ vars.DOCKERHUB_REPO || 'fvrodrigues/nfse' }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request' && github.repository == 'fvrodrigues/nfs'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # On PRs we only build + load locally for the smoke test. On pushes
+      # to main / tags we also push the same image to Docker Hub.
       - name: Build image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
-          push: false
+          # Always load into the runner's docker so the smoke test can run
+          # it by name. Push when not a PR.
           load: true
+          push: ${{ github.event_name != 'pull_request' && github.repository == 'fvrodrigues/nfs' }}
           tags: |
-            nfse:${{ github.sha }}
             nfse:ci
+            ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
