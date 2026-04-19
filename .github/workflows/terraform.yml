@@ -62,6 +62,13 @@ jobs:
       # dispatches see existing resources and don't try to recreate them.
       # First-ever run has nothing to download and proceeds with empty
       # state, which is the correct behaviour.
+      #
+      # workflow_conclusion is intentionally empty so we pick up state
+      # from failed runs too: upload runs on `if: always()` after
+      # apply/destroy, so a partially-failed apply still publishes
+      # up-to-date state. Filtering on `success` would skip that state
+      # and reuse stale state from the last successful run, orphaning
+      # any resources created by the failed run.
       - name: Download prior terraform state
         id: state_download
         uses: dawidd6/action-download-artifact@v6
@@ -69,7 +76,7 @@ jobs:
           name: ${{ env.STATE_ARTIFACT_NAME }}
           path: infra/terraform
           workflow: terraform.yml
-          workflow_conclusion: success
+          workflow_conclusion: ""
           if_no_artifact_found: warn
 
       - name: terraform init
