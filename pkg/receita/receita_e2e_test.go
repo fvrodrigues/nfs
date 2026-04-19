@@ -26,7 +26,9 @@ import (
 // SP NFS-e portal for Rod to drive through it end-to-end:
 //
 //	1. GET /login.aspx                → page with `.oauth-button` → /login-unico
-//	2. GET /login-unico               → page with #cpfCnpj, #password, .btn-entrar
+//	2. GET /login-unico               → page with input[name=Username],
+//	                                    input[name=Password], and a
+//	                                    button[type=submit] Entrar
 //	                                    (on click, JS redirects to /logged-in)
 //	3. GET /logged-in                 → landing page (no .text-danger, no captcha)
 //	4. GET /contribuinte/nota.aspx    → CNPJ + data form with #ctl00_body_btAvancar
@@ -89,18 +91,21 @@ func newMockPortal(t *testing.T) *mockPortal {
 
 	mux.HandleFunc("/login-unico", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// Mirror the real Login Único form at pmspauth.prefeitura.sp.gov.br:
+		// fields are addressed by `name="Username"`/`name="Password"` and the
+		// submit button is a plain `button[type="submit"]`.
 		fmt.Fprint(w, `<!doctype html><html><head><meta charset="utf-8"><title>mock login único</title></head>
 <body>
 <h1>Login Único (mock)</h1>
 <form id="loginForm" onsubmit="return submitLogin();">
-  <input id="cpfCnpj" name="cpfCnpj" autocomplete="off">
-  <input id="password" name="password" type="password" autocomplete="off">
-  <button type="button" class="btn-entrar" onclick="submitLogin()">Entrar</button>
+  <input name="Username" autocomplete="off">
+  <input name="Password" type="password" autocomplete="off">
+  <button type="submit" onclick="submitLogin()">Entrar</button>
 </form>
 <script>
 function submitLogin() {
-  var u = encodeURIComponent(document.getElementById('cpfCnpj').value);
-  var p = encodeURIComponent(document.getElementById('password').value);
+  var u = encodeURIComponent(document.getElementsByName('Username')[0].value);
+  var p = encodeURIComponent(document.getElementsByName('Password')[0].value);
   window.location.href = '/logged-in?cpf=' + u + '&senha=' + p;
   return false;
 }

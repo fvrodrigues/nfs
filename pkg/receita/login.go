@@ -14,6 +14,17 @@ import (
 // o que é usado principalmente em testes para apontar para um portal "mock".
 const defaultSiteBase = "https://nfe.prefeitura.sp.gov.br"
 
+// Seletores da página de Login Único. A SP trocou o formulário de
+// IDs dedicados (#cpfCnpj, #password, .btn-entrar) para um formulário
+// ASP.NET padrão com campos por `name="Username"`/`name="Password"` e
+// botões de submit sem classe específica. Os nomes permanecem estáveis
+// porque são exigidos pelo backend.
+const (
+	loginCPFCNPJSelector = `input[name="Username"]`
+	loginSenhaSelector   = `input[name="Password"]`
+	loginEntrarSelector  = `form button[type="submit"]`
+)
+
 // siteBase retorna a URL base do portal da Receita, respeitando a variável
 // de ambiente SITE quando ela estiver definida.
 func siteBase() string {
@@ -81,29 +92,29 @@ func (r *Receita) ColocarDadosLogin(cpfCnpj, senha string) error {
 
 	r.PausaHumana(2)
 
-	// Espera o campo de CPF/CNPJ ser visível antes de escrever
-	elCpf, err := r.Timeout(10 * time.Second).Element("#cpfCnpj")
+	// Espera o campo de CPF/CNPJ ser visível antes de escrever.
+	// A página de Login Único (pmspauth.prefeitura.sp.gov.br) usa
+	// `input[name="Username"]` / `input[name="Password"]` em vez de
+	// IDs dedicados para o CPF/CNPJ e a senha.
+	elCpf, err := r.Timeout(10 * time.Second).Element(loginCPFCNPJSelector)
 	if err != nil {
-		return r.wrapErrorApertarElemento(err, "#cpfCnpj", "escrever no campo de cpf/cnpj")
+		return r.wrapErrorApertarElemento(err, loginCPFCNPJSelector, "escrever no campo de cpf/cnpj")
 	}
 	elCpf.MustWaitVisible() // Garante que o campo está visível
 
-	// Imprime ou salva
-	fmt.Println(cpfCnpj)
-
-	if err := r.EscreverComoHumano("#cpfCnpj", cpfCnpj); err != nil {
-		return r.wrapErrorApertarElemento(err, "#cpfCnpj", "escrever no campo de cpf/cnpj")
+	if err := r.EscreverComoHumano(loginCPFCNPJSelector, cpfCnpj); err != nil {
+		return r.wrapErrorApertarElemento(err, loginCPFCNPJSelector, "escrever no campo de cpf/cnpj")
 	}
 
 	// Espera o campo de senha ser visível antes de escrever
-	elSenha, err := r.Timeout(10 * time.Second).Element("#password")
+	elSenha, err := r.Timeout(10 * time.Second).Element(loginSenhaSelector)
 	if err != nil {
-		return r.wrapErrorApertarElemento(err, "#password", "escrever no campo de senha")
+		return r.wrapErrorApertarElemento(err, loginSenhaSelector, "escrever no campo de senha")
 	}
 	elSenha.MustWaitVisible() // Garante que o campo está visível
 
-	if err := r.EscreverComoHumano("#password", senha); err != nil {
-		return r.wrapErrorApertarElemento(err, "#password", "escrever no campo de senha")
+	if err := r.EscreverComoHumano(loginSenhaSelector, senha); err != nil {
+		return r.wrapErrorApertarElemento(err, loginSenhaSelector, "escrever no campo de senha")
 	}
 
 	return nil
@@ -118,8 +129,8 @@ func (r *Receita) ApertarLogin() error {
 	}
 	r.PausaHumana(2)
 
-	if err := r.ApertarElemento(".btn-entrar"); err != nil {
-		return r.wrapErrorApertarElemento(err, ".btn-entrar", "fazer login")
+	if err := r.ApertarElemento(loginEntrarSelector); err != nil {
+		return r.wrapErrorApertarElemento(err, loginEntrarSelector, "fazer login")
 	}
 
 	if existe, _, _ := r.Timeout(400 * time.Millisecond).Has(".text-danger"); existe {
