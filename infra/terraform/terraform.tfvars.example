@@ -2,6 +2,7 @@ region        = "us-east-1"
 instance_type = "t2.micro" # sandbox/free-tier default; bump to t3.medium+ for real workloads
 docker_image  = "rodriguesflavio/nfse:latest"
 
-# Restrict SSH to your IP if you want SSH access. Leave empty to disable SSH.
+# SSH defaults to 0.0.0.0/0 so you can use EC2 Instance Connect from the
+# Console without a key pair. Restrict to your own IP in production:
 # ssh_ingress_cidrs = ["203.0.113.42/32"]
-# key_pair_name     = "my-existing-keypair"
+# key_pair_name     = "my-existing-keypair"  # optional; not needed for EIC
