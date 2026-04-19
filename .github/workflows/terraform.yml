@@ -1,0 +1,113 @@
+name: Terraform
+
+# Manual-dispatch only: pick an action (plan | apply | destroy) and the
+# workflow runs it against infra/terraform. State is persisted between
+# runs by uploading terraform.tfstate as a workflow artifact. This is a
+# single-operator, not-concurrent setup; if you need multi-user or
+# concurrent applies, switch to an S3 + DynamoDB backend.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Terraform action to run"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  # Only one Terraform action can run at a time against the shared state
+  # artifact. Don't cancel in-progress runs — let apply/destroy finish.
+  group: terraform-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: "1.9.8"
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  STATE_ARTIFACT_NAME: terraform-state
+
+jobs:
+  terraform:
+    name: terraform ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # Pull the latest prior state artifact (if any) so subsequent
+      # dispatches see existing resources and don't try to recreate them.
+      # First-ever run has nothing to download and proceeds with empty
+      # state, which is the correct behaviour.
+      - name: Download prior terraform state
+        id: state_download
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          name: ${{ env.STATE_ARTIFACT_NAME }}
+          path: infra/terraform
+          workflow: terraform.yml
+          workflow_conclusion: success
+          if_no_artifact_found: warn
+
+      - name: terraform init
+        run: terraform init -input=false
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: terraform plan
+        if: inputs.action == 'plan'
+        run: terraform plan -input=false -no-color
+
+      - name: terraform apply
+        if: inputs.action == 'apply'
+        run: terraform apply -input=false -auto-approve -no-color
+
+      - name: terraform destroy
+        if: inputs.action == 'destroy'
+        run: terraform destroy -input=false -auto-approve -no-color
+
+      # Always upload the (possibly updated) state so the next dispatch
+      # can pick it up. Uploading on plan is a no-op for state content
+      # but keeps the artifact flow uniform.
+      - name: Upload terraform state
+        if: always() && inputs.action != 'plan'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.STATE_ARTIFACT_NAME }}
+          path: |
+            infra/terraform/terraform.tfstate
+            infra/terraform/terraform.tfstate.backup
+          if-no-files-found: warn
+          retention-days: 90
+          overwrite: true
+
+      - name: Show outputs (apply only)
+        if: inputs.action == 'apply'
+        run: terraform output

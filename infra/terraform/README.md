@@ -18,6 +18,21 @@ API Gateway HTTP API has a hard 30s integration timeout. The nfse `/prestador` f
 
 ## Usage
 
+### From GitHub Actions (recommended)
+
+A manual-dispatch workflow at [`.github/workflows/terraform.yml`](../../.github/workflows/terraform.yml) runs `terraform plan`, `apply`, or `destroy` against this module. Trigger it from **Actions → Terraform → Run workflow**, pick an action, and hit **Run workflow**.
+
+Before the first run, add two repo secrets at https://github.com/fvrodrigues/nfs/settings/secrets/actions:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+
+The IAM principal behind those keys needs permissions for EC2, VPC (read default), IAM (role + instance profile), API Gateway v2, and SSM (`GetParameter` for the AMI lookup).
+
+**State persistence caveat.** The workflow uploads `terraform.tfstate` as a workflow artifact after every `apply`/`destroy` and downloads the most recent successful artifact before each run. This gives you working state across sequential dispatches but is **single-operator, not concurrent**. Don't trigger two `apply`s back-to-back, and don't mix local `terraform apply` with workflow `apply` — the artifact won't see local changes and vice versa. If more than one person needs to run this, switch to an S3 + DynamoDB backend.
+
+### From your laptop
+
 ```bash
 cd infra/terraform
 terraform init
