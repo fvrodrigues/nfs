@@ -333,13 +333,13 @@ func TestLoginE2E(t *testing.T) {
 // an arbitrary payload locally (e.g. your real provider creds). That file is
 // never read in CI.
 const defaultFullE2EPayload = `{
-    "prestador": "Ahtrios",
+    "prestador": "MockPrestador",
     "login": "00000000000000",
     "senha": "mock-senha",
     "notas": [
         {
-            "tomador": "kamilla",
-            "cnpj": "41813528896",
+            "tomador": "MockTomador",
+            "cnpj": "00000000000",
             "valor": "10",
             "observacao": "teste",
             "data": "02/03/2026"
