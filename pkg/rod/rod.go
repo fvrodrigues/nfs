@@ -3,6 +3,7 @@ package rod
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/go-rod/rod"
@@ -12,6 +13,27 @@ import (
 	"github.com/go-rod/stealth"
 	"github.com/ysmood/gson"
 )
+
+// chromiumBin is the default path to the Chromium binary. Can be overridden
+// at runtime with the CHROMIUM_BIN environment variable.
+const chromiumBin = "/opt/chromium/chrome-linux/chrome"
+
+func resolveChromiumBin() string {
+	if v := os.Getenv("CHROMIUM_BIN"); v != "" {
+		return v
+	}
+	return chromiumBin
+}
+
+func resolveHeadless(headless bool) bool {
+	switch os.Getenv("NFSE_HEADLESS") {
+	case "1", "true", "TRUE":
+		return true
+	case "0", "false", "FALSE":
+		return false
+	}
+	return headless
+}
 
 type Pagina struct {
 	Navegador *rod.Browser
@@ -23,7 +45,7 @@ type Pagina struct {
 // Se true, navegador virá headless
 func CriarNavegador(headless bool) (*Pagina, error) {
 
-	l := launcher.New().Bin("/opt/chromium/chrome-linux/chrome").Headless(headless).Devtools(false)
+	l := launcher.New().Bin(resolveChromiumBin()).Headless(resolveHeadless(headless)).Devtools(false)
 	l.Set("disable-gpu")
 	l.Set("no-sandbox")
 	l.Set("disable-dev-shm-usage")

@@ -11,7 +11,7 @@ func (r *Receita) IrParaFormsEmissao() error {
 		return r.wrapErroLoad(err)
 	}
 	r.PausaHumana(2)
-	err := r.AcessarSite("https://nfe.prefeitura.sp.gov.br/contribuinte/nota.aspx")
+	err := r.AcessarSite(siteBase() + "/contribuinte/nota.aspx")
 	if err != nil {
 		return err
 	}

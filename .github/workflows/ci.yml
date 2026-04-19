@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "1.25.4"
+  CHROMIUM_REV: "1321438"
+
+jobs:
+  build:
+    name: Build & vet
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: go build
+        run: go build -v ./...
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: Compile nfse binary
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o dist/nfse ./cmd/main
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfse-linux-amd64
+          path: dist/nfse
+          if-no-files-found: error
+
+  test:
+    name: Unit + E2E tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install Chromium runtime deps
+        run: |
+          sudo apt-get update
+          # libasound2 → libasound2t64 on Ubuntu 24.04 (t64 transition).
+          sudo apt-get install -y --no-install-recommends \
+            fonts-liberation libasound2t64 libatk-bridge2.0-0 libatk1.0-0 \
+            libatspi2.0-0 libcairo2 libcups2 libdbus-1-3 libdrm2 libexpat1 \
+            libgbm1 libglib2.0-0 libnspr4 libnss3 libpango-1.0-0 libx11-6 \
+            libx11-xcb1 libxcb1 libxcomposite1 libxdamage1 libxext6 \
+            libxfixes3 libxkbcommon0 libxrandr2 libxshmfence1 libu2f-udev \
+            libvulkan1 libgtk-3-0
+
+      - name: Download Chromium snapshot ${{ env.CHROMIUM_REV }}
+        run: |
+          set -euo pipefail
+          sudo mkdir -p /opt/chromium
+          curl -fsSL -o /tmp/chrome.zip \
+            "https://storage.googleapis.com/chromium-browser-snapshots/Linux_x64/${{ env.CHROMIUM_REV }}/chrome-linux.zip"
+          sudo unzip -q /tmp/chrome.zip -d /opt/chromium/
+          sudo chmod -R a+rx /opt/chromium/chrome-linux
+          /opt/chromium/chrome-linux/chrome --version
+
+      - name: Run tests (with e2e)
+        env:
+          CHROMIUM_BIN: /opt/chromium/chrome-linux/chrome
+          NFSE_HEADLESS: "1"
+        run: go test -v -timeout 5m ./...
+
+  docker:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: true
+          tags: |
+            nfse:${{ github.sha }}
+            nfse:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test image starts and serves HTTP
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name nfse-smoke -e PORT=8080 -p 18080:8080 nfse:ci
+          # Wait for the server to report it's listening.
+          for i in $(seq 1 30); do
+            if docker logs nfse-smoke 2>&1 | grep -q "Servidor rodando na porta"; then
+              break
+            fi
+            sleep 1
+          done
+          docker logs nfse-smoke
+          # GET should return 405 (only POST is allowed on /prestador).
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:18080/prestador)
+          echo "GET /prestador -> $code"
+          test "$code" = "405"
+          docker stop nfse-smoke
