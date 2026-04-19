@@ -52,7 +52,12 @@ COPY --from=build /out/nfse /opt/nfse/nfse
 
 # Default port so `docker run -p 8080:8080` works. Overridable with PORT env.
 ENV PORT=8080
-ENV NFSE_HEADLESS=1
+# Default to headful Chromium driven by Xvfb. The SP Login Único portal
+# (pmspauth.prefeitura.sp.gov.br) resets connections for true-headless
+# Chromium, so any container running with NFSE_HEADLESS=1 fails to reach
+# the login form at all (ERR_CONNECTION_RESET). Headful + Xvfb looks like
+# a regular browser from the network's perspective and gets through.
+ENV NFSE_HEADLESS=0
 ENV CHROMIUM_BIN=/opt/chromium/chrome-linux/chrome
 EXPOSE 8080
 

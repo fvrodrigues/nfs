@@ -126,10 +126,12 @@ docker run --rm -e PORT=8080 -p 8080:8080 nfse:local
 
 Notes:
 
-- `NFSE_HEADLESS=1` and `CHROMIUM_BIN=/opt/chromium/chrome-linux/chrome` are
-  set as image defaults.
-- If you need headful (e.g. for debugging), set `NFSE_HEADLESS=0`; the
-  entrypoint spins up `Xvfb` on `DISPLAY=:99` automatically.
+- `NFSE_HEADLESS=0` (headful) and `CHROMIUM_BIN=/opt/chromium/chrome-linux/chrome`
+  are set as image defaults. The entrypoint starts `Xvfb` on `DISPLAY=:99`
+  automatically when `NFSE_HEADLESS=0`. This is the default because the SP
+  Login Único portal resets connections for true-headless Chromium.
+- To force true-headless anyway (e.g. for local e2e tests against the mock
+  portal), set `NFSE_HEADLESS=1`.
 - The runtime container runs as an unprivileged `nfse` user.
 
 ## Continuous integration
