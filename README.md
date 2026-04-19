@@ -42,13 +42,13 @@ Example:
 curl -X POST http://localhost:8080/prestador \
   -H 'Content-Type: application/json' \
   -d '{
-    "prestador": "Ahtrios",
-    "login": "00000000000000",
-    "senha": "sua-senha",
+    "prestador": "Nome do Prestador",
+    "login": "<CPF-ou-CNPJ-do-prestador>",
+    "senha": "<senha-do-portal>",
     "notas": [
       {
-        "tomador": "kamilla",
-        "cnpj": "41813528896",
+        "tomador": "Nome do Tomador",
+        "cnpj": "<CPF-ou-CNPJ-do-tomador>",
         "valor": "10",
         "observacao": "teste",
         "data": "02/03/2026"
