@@ -58,7 +58,7 @@ See [`variables.tf`](variables.tf) for the full list. Highlights:
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `region` | `us-east-1` | AWS region. |
-| `instance_type` | `t3.medium` | Realistic minimum for Chromium + Go. |
+| `instance_type` | `t2.micro` | Sandbox/free-tier default. **Too small for the real workload** — Chromium will OOM on 1 GB RAM. Use `t3.medium` or larger for a functional deployment. |
 | `docker_image` | `rodriguesflavio/nfse:latest` | Image the host pulls and runs. |
 | `app_port` | `8080` | Host + container port. |
 | `app_ingress_cidrs` | `["0.0.0.0/0"]` | Who can hit `:8080` on EC2. Tighten to your callers' CIDR if possible. |

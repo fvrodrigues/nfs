@@ -1,5 +1,5 @@
 region        = "us-east-1"
-instance_type = "t3.medium"
+instance_type = "t2.micro" # sandbox/free-tier default; bump to t3.medium+ for real workloads
 docker_image  = "rodriguesflavio/nfse:latest"
 
 # Restrict SSH to your IP if you want SSH access. Leave empty to disable SSH.
