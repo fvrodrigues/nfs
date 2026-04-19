@@ -44,40 +44,11 @@ resource "aws_security_group" "nfse" {
   }
 }
 
-# IAM role so the host can be managed over SSM Session Manager without
-# opening SSH. Lets you `aws ssm start-session` into the box even when
-# ssh_ingress_cidrs is empty.
-resource "aws_iam_role" "nfse" {
-  name = "${var.project}-ec2-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
-      Action = "sts:AssumeRole"
-    }]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "ssm_core" {
-  role       = aws_iam_role.nfse.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_instance_profile" "nfse" {
-  name = "${var.project}-ec2-profile"
-  role = aws_iam_role.nfse.name
-}
-
 resource "aws_instance" "nfse" {
   ami                         = data.aws_ssm_parameter.al2023_ami.value
   instance_type               = var.instance_type
   subnet_id                   = data.aws_subnets.default.ids[0]
   vpc_security_group_ids      = [aws_security_group.nfse.id]
-  iam_instance_profile        = aws_iam_instance_profile.nfse.name
   associate_public_ip_address = var.associate_public_ip
   key_name                    = var.key_pair_name != "" ? var.key_pair_name : null
 

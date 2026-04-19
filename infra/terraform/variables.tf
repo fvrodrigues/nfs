@@ -35,13 +35,13 @@ variable "app_ingress_cidrs" {
 }
 
 variable "ssh_ingress_cidrs" {
-  description = "CIDR blocks allowed to SSH into the EC2 instance. Leave empty to disable SSH entirely (recommended in production; use SSM Session Manager instead if you need shell access)."
+  description = "CIDR blocks allowed to SSH into the EC2 instance. Leave empty to disable SSH entirely (recommended in production)."
   type        = list(string)
   default     = []
 }
 
 variable "key_pair_name" {
-  description = "Optional name of an existing EC2 key pair. If empty, no key pair is attached and SSH is only possible via SSM Session Manager."
+  description = "Optional name of an existing EC2 key pair. If empty, no key pair is attached and SSH is unavailable."
   type        = string
   default     = ""
 }

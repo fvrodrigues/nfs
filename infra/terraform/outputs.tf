@@ -1,5 +1,5 @@
 output "instance_id" {
-  description = "EC2 instance ID. Use with `aws ssm start-session --target <id>` for a shell without SSH."
+  description = "EC2 instance ID."
   value       = aws_instance.nfse.id
 }
 
