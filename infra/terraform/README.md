@@ -4,7 +4,6 @@ This module provisions a minimal AWS footprint for running the `rodriguesflavio/
 
 - **EC2** (Amazon Linux 2023) with Docker installed via `user_data`, pulling and running the image on `:8080` with `restart=unless-stopped`.
 - **Security group** allowing inbound `:8080` from the internet (configurable) so callers can hit `/prestador` directly without the 30s API Gateway timeout.
-- **IAM instance profile** with `AmazonSSMManagedInstanceCore` so you can shell in via SSM Session Manager without opening SSH.
 - **HTTP API Gateway v2** (`enable_api_gateway = true` by default) with a catch-all `ANY /{proxy+}` route pointing at the EC2. Provided for convenience / future lightweight endpoints; **do not call `/prestador` through it** unless your flow completes in under 30 seconds.
 
 ## Why EC2 is the primary entry point
@@ -14,7 +13,7 @@ API Gateway HTTP API has a hard 30s integration timeout. The nfse `/prestador` f
 ## Prerequisites
 
 - Terraform `>= 1.5`
-- AWS credentials in the environment (`aws configure`, `aws sso login`, or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars). The identity used needs permission to create EC2 instances, security groups, IAM roles, instance profiles, and HTTP API Gateway v2 resources.
+- AWS credentials in the environment (`aws configure`, `aws sso login`, or `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` env vars). The identity used needs permission to create EC2 instances, security groups, and HTTP API Gateway v2 resources.
 
 ## Usage
 
@@ -27,7 +26,7 @@ Before the first run, add two repo secrets at https://github.com/fvrodrigues/nfs
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 
-The IAM principal behind those keys needs permissions for EC2, VPC (read default), IAM (role + instance profile), API Gateway v2, and SSM (`GetParameter` for the AMI lookup).
+The IAM principal behind those keys needs permissions for EC2, VPC (read default), API Gateway v2, and SSM (`GetParameter` for the AMI lookup).
 
 **State persistence caveat.** The workflow uploads `terraform.tfstate` as a workflow artifact after every `apply`/`destroy` and downloads the most recent successful artifact before each run. This gives you working state across sequential dispatches but is **single-operator, not concurrent**. Don't trigger two `apply`s back-to-back, and don't mix local `terraform apply` with workflow `apply` — the artifact won't see local changes and vice versa. If more than one person needs to run this, switch to an S3 + DynamoDB backend.
 
@@ -45,7 +44,7 @@ After apply, the outputs include:
 
 - `app_url` — `http://<ec2-public-dns>:8080`, the primary entry point
 - `api_gateway_url` — HTTP API Gateway invoke URL (null if disabled)
-- `instance_id` — useful for `aws ssm start-session --target <id>`
+- `instance_id` — EC2 instance ID
 
 Test `/prestador` against EC2 directly:
 
@@ -66,30 +65,23 @@ See [`variables.tf`](variables.tf) for the full list. Highlights:
 | `docker_image` | `rodriguesflavio/nfse:latest` | Image the host pulls and runs. |
 | `app_port` | `8080` | Host + container port. |
 | `app_ingress_cidrs` | `["0.0.0.0/0"]` | Who can hit `:8080` on EC2. Tighten to your callers' CIDR if possible. |
-| `ssh_ingress_cidrs` | `[]` | SSH ingress. Empty disables SSH; use SSM Session Manager instead. |
-| `key_pair_name` | `""` | Existing EC2 key pair name, only needed if you want SSH. |
+| `ssh_ingress_cidrs` | `[]` | SSH ingress. Empty disables SSH entirely. |
+| `key_pair_name` | `""` | Existing EC2 key pair name, required if you want SSH. |
 | `enable_api_gateway` | `true` | Set to `false` to skip the HTTP API entirely. |
 
-## Shell access without SSH
+## Shell access
+
+SSH into the host (requires `ssh_ingress_cidrs` and `key_pair_name` to be set):
 
 ```bash
-aws ssm start-session --target "$(terraform output -raw instance_id)"
+ssh -i /path/to/key.pem ec2-user@$(terraform output -raw instance_public_dns)
 ```
 
 Once inside, `docker ps` and `docker logs nfse` show the running container.
 
 ## Updating the image
 
-The container is started with `restart=unless-stopped` but does NOT auto-pull new tags. To roll out a new `:latest`:
-
-```bash
-aws ssm start-session --target "$(terraform output -raw instance_id)"
-sudo docker pull rodriguesflavio/nfse:latest
-sudo docker rm -f nfse
-sudo docker run -d --name nfse --restart unless-stopped -p 8080:8080 -e PORT=8080 rodriguesflavio/nfse:latest
-```
-
-Or just re-run `terraform apply -replace=aws_instance.nfse` to recreate the host with a fresh `user_data` bootstrap.
+The container is started with `restart=unless-stopped` but does NOT auto-pull new tags. To roll out a new `:latest`, re-run the Terraform workflow with `action=apply` (or run `terraform apply -replace=aws_instance.nfse` locally) — this recreates the EC2 host with a fresh `user_data` bootstrap that re-pulls the image.
 
 ## Tearing down
 
