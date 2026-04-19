@@ -1,0 +1,15 @@
+.git
+.github
+.gitignore
+bin/
+NFs/
+logs/
+.env
+.env.*
+.vscode
+.idea
+*.md
+!README.md
+Dockerfile
+.dockerignore
+scripts/

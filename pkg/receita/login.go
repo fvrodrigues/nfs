@@ -4,9 +4,24 @@ import (
 	"fmt"
 	"nfse/pkg/captcha"
 	"nfse/pkg/rod"
+	"os"
 	"strings"
 	"time"
 )
+
+// defaultSiteBase é a URL base do portal da Receita Municipal de São Paulo.
+// Em tempo de execução, pode ser sobrescrita pela variável de ambiente SITE,
+// o que é usado principalmente em testes para apontar para um portal "mock".
+const defaultSiteBase = "https://nfe.prefeitura.sp.gov.br"
+
+// siteBase retorna a URL base do portal da Receita, respeitando a variável
+// de ambiente SITE quando ela estiver definida.
+func siteBase() string {
+	if v := strings.TrimSpace(os.Getenv("SITE")); v != "" {
+		return strings.TrimRight(v, "/")
+	}
+	return defaultSiteBase
+}
 
 type Receita struct {
 	Captcha *captcha.Captcha
@@ -21,7 +36,7 @@ func New(pagina *rod.Pagina, captcha *captcha.Captcha) *Receita {
 }
 
 func (r *Receita) AcessarSiteReceita() error {
-	err := r.AcessarSite("https://nfe.prefeitura.sp.gov.br/login.aspx")
+	err := r.AcessarSite(siteBase() + "/login.aspx")
 	if err == nil {
 		return r.EsperarEstabilidade(1*time.Minute, 400*time.Millisecond)
 	}
